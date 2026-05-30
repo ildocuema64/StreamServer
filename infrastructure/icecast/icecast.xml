@@ -1,0 +1,234 @@
+<!--
+  =============================================================================
+  Icecast Configuration - StreamServer
+  =============================================================================
+  Professional configuration for multi-channel streaming with
+  BUTT encoder compatibility, relay support, and security hardening.
+-->
+<icecast>
+    <!-- ===================================================================
+         Server Limits
+         =================================================================== -->
+    <limits>
+        <clients>1000</clients>
+        <sources>10</sources>
+        <queue-size>524288</queue-size>
+        <client-timeout>30</client-timeout>
+        <header-timeout>15</header-timeout>
+        <source-timeout>10</source-timeout>
+        <burst-on-connect>1</burst-on-connect>
+        <burst-size>65535</burst-size>
+    </limits>
+
+    <!-- ===================================================================
+         Authentication
+         =================================================================== -->
+    <authentication>
+        <source-password>sourcepass</source-password>
+        <relay-password>relaypass</relay-password>
+        <admin-user>admin</admin-user>
+        <admin-password>adminpass</admin-password>
+    </authentication>
+
+    <!-- ===================================================================
+         Server Identity
+         =================================================================== -->
+    <hostname>localhost</hostname>
+    <location>StreamServer Radio</location>
+    <admin>admin@radio.example.com</admin>
+
+    <!-- ===================================================================
+         Fileserve (Web Interface)
+         =================================================================== -->
+    <fileserve>1</fileserve>
+    <paths>
+        <basedir>/usr/share/icecast2</basedir>
+        <logdir>/var/log/icecast2</logdir>
+        <webroot>/usr/share/icecast2/web</webroot>
+        <adminroot>/usr/share/icecast2/admin</adminroot>
+        <alias source="/" destination="/status.xsl"/>
+    </paths>
+
+    <!-- ===================================================================
+         HTTP Headers (CORS for Web Player)
+         =================================================================== -->
+    <http-headers>
+        <header name="Access-Control-Allow-Origin" value="*" />
+        <header name="Access-Control-Allow-Headers" value="Origin, Accept, X-Requested-With, Content-Type, Icy-MetaData" />
+        <header name="Access-Control-Allow-Methods" value="GET, OPTIONS, HEAD" />
+    </http-headers>
+
+    <!-- ===================================================================
+         Listen Socket
+         =================================================================== -->
+    <listen-socket>
+        <port>8000</port>
+        <bind-address>0.0.0.0</bind-address>
+    </listen-socket>
+
+    <!-- ===================================================================
+         Mount Points
+         =================================================================== -->
+
+    <!-- Default mount: per-station URL auth for dynamic mounts (/{slug}/live) -->
+    <mount type="default">
+        <public>1</public>
+        <max-listeners>500</max-listeners>
+        <authentication type="url">
+            <option name="stream_auth" value="http://backend:3000/api/internal/icecast/auth"/>
+            <option name="auth_header" value="icecast-auth-user: 1"/>
+        </authentication>
+    </mount>
+
+    <!-- Main Live Stream (MP3 - BUTT compatible) -->
+    <mount type="normal">
+        <mount-name>/live</mount-name>
+        <max-listeners>500</max-listeners>
+        <fallback-mount>/autodj</fallback-mount>
+        <fallback-override>1</fallback-override>
+        <fallback-when-full>1</fallback-when-full>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer Live</stream-name>
+        <stream-description>Professional Live Broadcasting</stream-description>
+        <stream-url>https://radio.example.com</stream-url>
+        <genre>Various</genre>
+        <bitrate>128</bitrate>
+        <type>audio/mpeg</type>
+        <subtype>mp3</subtype>
+        <charset>UTF-8</charset>
+        <authentication type="url">
+            <option name="stream_auth" value="http://backend:3000/api/internal/icecast/auth"/>
+            <option name="auth_header" value="icecast-auth-user: 1"/>
+        </authentication>
+    </mount>
+
+    <!-- AutoDJ Stream (Liquidsoap fallback) -->
+    <mount type="normal">
+        <mount-name>/autodj</mount-name>
+        <username>source</username>
+        <password>sourcepass</password>
+        <max-listeners>500</max-listeners>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer AutoDJ</stream-name>
+        <stream-description>Automated Music Programming</stream-description>
+        <genre>Various</genre>
+        <bitrate>128</bitrate>
+        <type>audio/mpeg</type>
+    </mount>
+
+    <!-- High Quality Stream (AAC) -->
+    <mount type="normal">
+        <mount-name>/live-hq</mount-name>
+        <username>source</username>
+        <password>sourcepass</password>
+        <max-listeners>200</max-listeners>
+        <fallback-mount>/autodj-hq</fallback-mount>
+        <fallback-override>1</fallback-override>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer Live HQ</stream-name>
+        <stream-description>High Quality AAC Stream</stream-description>
+        <genre>Various</genre>
+        <bitrate>256</bitrate>
+        <type>audio/aac</type>
+    </mount>
+
+    <!-- AutoDJ HQ Stream -->
+    <mount type="normal">
+        <mount-name>/autodj-hq</mount-name>
+        <username>source</username>
+        <password>sourcepass</password>
+        <max-listeners>200</max-listeners>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer AutoDJ HQ</stream-name>
+        <stream-description>Automated HQ Programming</stream-description>
+        <genre>Various</genre>
+        <bitrate>256</bitrate>
+        <type>audio/aac</type>
+    </mount>
+
+    <!-- OGG Vorbis Stream -->
+    <mount type="normal">
+        <mount-name>/live-ogg</mount-name>
+        <username>source</username>
+        <password>sourcepass</password>
+        <max-listeners>200</max-listeners>
+        <fallback-mount>/autodj-ogg</fallback-mount>
+        <fallback-override>1</fallback-override>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer OGG</stream-name>
+        <stream-description>OGG Vorbis Stream</stream-description>
+        <genre>Various</genre>
+        <bitrate>192</bitrate>
+        <type>application/ogg</type>
+    </mount>
+
+    <!-- AutoDJ OGG -->
+    <mount type="normal">
+        <mount-name>/autodj-ogg</mount-name>
+        <username>source</username>
+        <password>sourcepass</password>
+        <max-listeners>200</max-listeners>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer AutoDJ OGG</stream-name>
+        <stream-description>Automated OGG Programming</stream-description>
+        <genre>Various</genre>
+        <bitrate>192</bitrate>
+        <type>application/ogg</type>
+    </mount>
+
+    <!-- Mobile Stream (Low Bitrate) -->
+    <mount type="normal">
+        <mount-name>/mobile</mount-name>
+        <username>source</username>
+        <password>sourcepass</password>
+        <max-listeners>300</max-listeners>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer Mobile</stream-name>
+        <stream-description>Low Bandwidth Mobile Stream</stream-description>
+        <genre>Various</genre>
+        <bitrate>64</bitrate>
+        <type>audio/mpeg</type>
+    </mount>
+
+    <!-- ===================================================================
+         Relay Configuration (uncomment to enable)
+         =================================================================== -->
+    <!--
+    <relay>
+        <server>upstream-server.example.com</server>
+        <port>8000</port>
+        <mount>/live</mount>
+        <local-mount>/relay</local-mount>
+        <username>relay</username>
+        <password>relaypass</password>
+        <on-demand>0</on-demand>
+        <relay-shoutcast-metadata>1</relay-shoutcast-metadata>
+    </relay>
+    -->
+
+    <!-- ===================================================================
+         Logging
+         =================================================================== -->
+    <logging>
+        <accesslog>access.log</accesslog>
+        <errorlog>error.log</errorlog>
+        <playlistlog>playlist.log</playlistlog>
+        <loglevel>3</loglevel>
+        <logsize>10000</logsize>
+        <logarchive>1</logarchive>
+    </logging>
+
+    <!-- ===================================================================
+         Security
+         =================================================================== -->
+    <security>
+        <chroot>0</chroot>
+    </security>
+</icecast>

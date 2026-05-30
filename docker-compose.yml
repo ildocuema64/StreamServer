@@ -1,0 +1,225 @@
+# =============================================================================
+# StreamServer - Docker Compose (Development)
+# =============================================================================
+# Uses `.env` in this directory for secrets (copy from `.env.example` at repo root).
+# For Supabase-only DB: run the backend on the host (`npm run dev:backend`) with
+# DATABASE_URL in root `.env`; this file still helps for Redis / Icecast / Liquidsoap.
+#
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: streamserver-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-streamserver}
+      POSTGRES_USER: ${POSTGRES_USER:-streamadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-streamadmin} -d ${POSTGRES_DB:-streamserver}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - streamserver
+
+  # ---------------------------------------------------------------------------
+  # Redis Cache
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: streamserver-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-devredis} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-devredis}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - streamserver
+
+  # ---------------------------------------------------------------------------
+  # Icecast Streaming Server
+  # ---------------------------------------------------------------------------
+  icecast:
+    image: infiniteproject/icecast:latest
+    container_name: streamserver-icecast
+    restart: unless-stopped
+    environment:
+      ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD:-sourcepass}
+      ICECAST_RELAY_PASSWORD: ${ICECAST_RELAY_PASSWORD:-relaypass}
+      ICECAST_ADMIN_PASSWORD: ${ICECAST_ADMIN_PASSWORD:-adminpass}
+      ICECAST_ADMIN_USERNAME: ${ICECAST_ADMIN_USER:-admin}
+      ICECAST_HOSTNAME: ${ICECAST_HOSTNAME:-localhost}
+      ICECAST_MAX_CLIENTS: ${ICECAST_MAX_CLIENTS:-1000}
+      ICECAST_MAX_SOURCES: ${ICECAST_MAX_SOURCES:-10}
+    volumes:
+      - ./infrastructure/icecast/icecast.xml:/etc/icecast2/icecast.xml
+      - ./infrastructure/icecast/web:/usr/share/icecast2/web
+      - icecast_logs:/var/log/icecast2
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/status-json.xsl"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - streamserver
+
+  # ---------------------------------------------------------------------------
+  # Liquidsoap AutoDJ / Stream Processor
+  # ---------------------------------------------------------------------------
+  liquidsoap:
+    build:
+      context: ./infrastructure/liquidsoap
+      dockerfile: Dockerfile
+    container_name: streamserver-liquidsoap
+    restart: unless-stopped
+    environment:
+      ICECAST_HOST: icecast
+      ICECAST_PORT: "8000"
+      ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD:-sourcepass}
+      LIQUIDSOAP_TELNET_PORT: "1234"
+    volumes:
+      - ./infrastructure/liquidsoap/radio.liq:/etc/liquidsoap/radio.liq
+      - ./infrastructure/liquidsoap/scripts:/etc/liquidsoap/scripts
+      - media_storage:/var/media
+      - recordings:/var/recordings
+    ports:
+      - "8005:8005"
+      - "1234:1234"
+    depends_on:
+      icecast:
+        condition: service_healthy
+    networks:
+      - streamserver
+
+  # ---------------------------------------------------------------------------
+  # Backend API (Node.js)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: streamserver-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      APP_PORT: ${APP_PORT:-3000}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-streamserver}
+      POSTGRES_USER: ${POSTGRES_USER:-streamadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-devredis}
+      ICECAST_HOST: icecast
+      ICECAST_PORT: "8000"
+      ICECAST_ADMIN_USER: ${ICECAST_ADMIN_USER:-admin}
+      ICECAST_ADMIN_PASSWORD: ${ICECAST_ADMIN_PASSWORD:-adminpass}
+      LIQUIDSOAP_TELNET_HOST: liquidsoap
+      LIQUIDSOAP_TELNET_PORT: "1234"
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      DATABASE_URL: ${DATABASE_URL:-}
+      REDIS_DISABLED: ${REDIS_DISABLED:-}
+      ICECAST_DISABLED: ${ICECAST_DISABLED:-}
+      MEDIA_STORAGE_PATH: /var/media
+      RECORDINGS_PATH: /var/recordings
+    volumes:
+      - media_storage:/var/media
+      - recordings:/var/recordings
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      icecast:
+        condition: service_healthy
+    networks:
+      - streamserver
+
+  # ---------------------------------------------------------------------------
+  # Dashboard Frontend (React)
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: streamserver-dashboard
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - streamserver
+
+  # ---------------------------------------------------------------------------
+  # Nginx Reverse Proxy
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: streamserver-nginx
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d
+      - ./player:/usr/share/nginx/html/player
+      - nginx_logs:/var/log/nginx
+      # Uncomment for SSL:
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - icecast
+      - backend
+      - dashboard
+    networks:
+      - streamserver
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  icecast_logs:
+    driver: local
+  media_storage:
+    driver: local
+  recordings:
+    driver: local
+  nginx_logs:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  streamserver:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

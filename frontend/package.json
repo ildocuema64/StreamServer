@@ -1,0 +1,18 @@
+{
+  "name": "streamserver-dashboard",
+  "version": "1.0.0",
+  "description": "StreamServer Dashboard - Professional Radio Management",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.1",
+    "lucide": "^0.292.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

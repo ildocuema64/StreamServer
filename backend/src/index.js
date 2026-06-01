@@ -31,6 +31,8 @@ const recordingRoutes = require('./routes/recordings');
 const publicRoutes = require('./routes/public');
 const internalRoutes = require('./routes/internal');
 const healthRoutes = require('./routes/health');
+const adminRoutes = require('./routes/admin');
+const subscriptionRoutes = require('./routes/subscriptions');
 
 // WebSocket handler
 const { setupWebSocket } = require('./services/websocket');
@@ -88,6 +90,8 @@ app.set('trust proxy', 1);
 // =============================================================================
 // Routes
 // =============================================================================
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/stations', stationRoutes);

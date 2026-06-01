@@ -10,6 +10,7 @@
     "db:ping": "npm run db:ping --prefix backend",
     "seed": "npm run seed --prefix backend",
     "migrate": "npm run migrate --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
     "icecast:start": "bash scripts/start-icecast.sh",
     "icecast:stop": "bash scripts/stop-icecast.sh"
   }

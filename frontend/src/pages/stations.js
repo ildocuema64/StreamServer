@@ -2,9 +2,7 @@
 // Stations Page - Create stations, stream URLs & BUTT credentials
 // =============================================================================
 
-import { api, toast } from '../app.js';
-
-let currentUser = null;
+import { api, toast, getSubscription } from '../app.js';
 
 export function renderStations(container) {
   container.innerHTML = `
@@ -145,10 +143,10 @@ export function renderStations(container) {
 
 async function initPage() {
   try {
-    currentUser = await api('/auth/me');
-    const canManage = ['admin', 'manager'].includes(currentUser?.role);
+    const sub = getSubscription();
+    const canCreate = sub?.isAdmin || sub?.hasAccess;
     const btn = document.getElementById('btn-new-station');
-    if (btn) btn.style.display = canManage ? 'inline-flex' : 'none';
+    if (btn) btn.style.display = canCreate ? 'inline-flex' : 'none';
   } catch { /* ignore */ }
   loadStations();
 }
@@ -161,7 +159,7 @@ async function loadStations() {
     const stations = await api('/stations');
     if (!stations || stations.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" style="color:var(--text-muted);padding:16px;">
-        Sem estações. ${['admin','manager'].includes(currentUser?.role) ? 'Clica em "+ Nova Estação" para criar.' : ''}
+        Sem estações. ${getSubscription()?.hasAccess ? 'Clica em "+ Nova Estação" para criar.' : 'Subscreve um plano em Assinatura.'}
       </td></tr>`;
       return;
     }

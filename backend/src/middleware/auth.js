@@ -43,7 +43,17 @@ function tryVerifySupabaseAccessToken(token) {
   }
 }
 
-// Authentication middleware
+// Authentication middleware — loads full user profile
+async function loadUserProfile(userId) {
+  const result = await query(
+    `SELECT id, username, email, display_name, role, is_active,
+            account_status, blocked_at, blocked_reason, avatar_url
+     FROM users WHERE id = $1`,
+    [userId]
+  );
+  return result.rows[0] || null;
+}
+
 async function authenticate(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
@@ -57,24 +67,36 @@ async function authenticate(req, res, next) {
     const supPayload = tryVerifySupabaseAccessToken(token);
     if (supPayload && supPayload.sub) {
       const result = await query(
-        'SELECT id, username, email, role FROM users WHERE auth_user_id = $1 AND is_active = true',
+        'SELECT id FROM users WHERE auth_user_id = $1',
         [supPayload.sub]
       );
       if (result.rows.length > 0) {
-        const row = result.rows[0];
-        req.user = {
-          id: row.id,
-          username: row.username,
-          email: row.email,
-          role: row.role
-        };
+        const profile = await loadUserProfile(result.rows[0].id);
+        if (!profile || !profile.is_active || profile.account_status === 'blocked') {
+          return res.status(403).json({
+            error: 'Conta bloqueada ou inactiva.',
+            code: 'ACCOUNT_BLOCKED'
+          });
+        }
+        req.user = profile;
         return next();
       }
     }
 
     try {
       const decoded = verifyToken(token);
-      req.user = decoded;
+      const profile = await loadUserProfile(decoded.id);
+      if (!profile) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      if (!profile.is_active || profile.account_status === 'blocked') {
+        return res.status(403).json({
+          error: 'Conta bloqueada ou inactiva.',
+          code: 'ACCOUNT_BLOCKED',
+          reason: profile.blocked_reason
+        });
+      }
+      req.user = profile;
       return next();
     } catch (error) {
       if (error.name === 'TokenExpiredError') {

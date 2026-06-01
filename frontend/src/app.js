@@ -8,6 +8,52 @@ import { renderStreamControl } from './pages/stream.js';
 import { renderMedia } from './pages/media.js';
 import { renderSchedule } from './pages/schedule.js';
 import { renderDJs } from './pages/djs.js';
+import { renderSubscription } from './pages/subscription.js';
+import { renderAdmin } from './pages/admin.js';
+
+let currentUser = null;
+let subscriptionState = null;
+
+export function getSubscription() { return subscriptionState; }
+export function setSubscription(s) {
+  subscriptionState = s;
+  updateNavVisibility();
+}
+
+async function loadSession() {
+  try {
+    const [user, sub] = await Promise.all([
+      api('/auth/me'),
+      api('/subscriptions/me')
+    ]);
+    currentUser = user;
+    subscriptionState = sub;
+    updateUserUI(user);
+    updateNavVisibility();
+    return { user, sub };
+  } catch { return null; }
+}
+
+function updateUserUI(user) {
+  if (!user) return;
+  const avatar = document.querySelector('.user-avatar');
+  const name = document.querySelector('.user-name');
+  const role = document.querySelector('.user-role');
+  if (avatar) avatar.textContent = (user.username || 'A')[0].toUpperCase();
+  if (name) name.textContent = user.username || 'User';
+  if (role) role.textContent = user.role === 'admin' ? 'Administrador' : 'Utilizador';
+}
+
+function updateNavVisibility() {
+  const isAdmin = currentUser?.role === 'admin';
+  document.getElementById('nav-admin')?.style.setProperty('display', isAdmin ? 'flex' : 'none');
+  const subBadge = document.getElementById('sub-badge');
+  if (subBadge && subscriptionState && !subscriptionState.isAdmin) {
+    subBadge.textContent = subscriptionState.hasAccess ? '✓' : '!';
+    subBadge.className = subscriptionState.hasAccess ? 'sub-badge active' : 'sub-badge inactive';
+    subBadge.style.display = 'inline';
+  }
+}
 
 // =============================================================================
 // API Helper
@@ -174,15 +220,18 @@ let currentPage = 'dashboard';
 
 const pages = {
   dashboard: { title: 'Dashboard', render: renderDashboard },
+  subscription: { title: 'Assinatura', render: renderSubscription },
   stations: { title: 'Estações', render: renderStations },
   stream: { title: 'Stream Control', render: renderStreamControl },
   media: { title: 'Media Library', render: renderMedia },
   schedule: { title: 'Agenda', render: renderSchedule },
-  djs: { title: 'DJs & Locutores', render: renderDJs }
+  djs: { title: 'DJs & Locutores', render: renderDJs },
+  admin: { title: 'Administração', render: renderAdmin, adminOnly: true }
 };
 
 function navigateTo(page) {
   if (!pages[page]) return;
+  if (pages[page].adminOnly && currentUser?.role !== 'admin') return;
   currentPage = page;
 
   // Update nav
@@ -235,25 +284,12 @@ document.addEventListener('DOMContentLoaded', () => {
           })
         });
 
-        // Show stream connection details to the user immediately
+        if (data.subscription) setSubscription(data.subscription);
         const panel = document.getElementById('signup-connection-panel');
-        const pre = document.getElementById('signup-connection');
-        if (panel && pre && data?.streamConnection?.icecast) {
+        if (panel) {
           panel.style.display = 'block';
-          const sc = data.streamConnection;
-          const ic = sc.icecast;
-          pre.textContent = [
-            `=== BUTT (Transmitir) ===`,
-            `Servidor: ${ic.host}`,
-            `Porta: ${ic.port}`,
-            `Mount: ${ic.mountpoint}`,
-            `Utilizador: ${ic.username}`,
-            `Password: ${ic.password}`,
-            `Formato: ${String(ic.format || '').toUpperCase()} ${ic.bitrate} kbps`,
-            '',
-            `=== Ouvir online ===`,
-            sc.listen_url || ''
-          ].join('\n');
+          document.getElementById('signup-connection').textContent =
+            data.message || 'Conta criada! Escolhe um plano de assinatura.';
         }
       } else {
         data = await api('/auth/login', {
@@ -263,18 +299,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       localStorage.setItem('token', data.token);
-      if (data.user) {
-        const avatar = document.querySelector('.user-avatar');
-        const name = document.querySelector('.user-name');
-        const role = document.querySelector('.user-role');
-        if (avatar) avatar.textContent = (data.user.username || 'A')[0].toUpperCase();
-        if (name) name.textContent = data.user.username || 'Admin';
-        if (role) role.textContent = data.user.role || 'admin';
-      }
+      currentUser = data.user;
+      if (data.subscription) setSubscription(data.subscription);
+      else await loadSession();
+      updateUserUI(data.user);
 
       hideLogin();
-      navigateTo('dashboard');
-      toast(authMode === 'signup' ? 'Conta criada com sucesso!' : 'Sessão iniciada com sucesso!', 'success');
+      const dest = authMode === 'signup' || !subscriptionState?.hasAccess && currentUser?.role !== 'admin'
+        ? 'subscription' : 'dashboard';
+      navigateTo(dest);
+      toast(authMode === 'signup' ? 'Conta criada! Escolhe um plano.' : 'Sessão iniciada!', 'success');
     } catch (err) {
       errorEl.textContent = err.message || 'Credenciais inválidas';
     }
@@ -298,16 +332,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Logout
   document.getElementById('btn-logout').addEventListener('click', () => {
     localStorage.removeItem('token');
+    currentUser = null;
+    subscriptionState = null;
     showLogin();
     toast('Sessão terminada', 'warning');
   });
 
-  // Check auth and init
   if (!isAuthenticated()) {
     setAuthMode('login');
     showLogin();
   } else {
-    navigateTo('dashboard');
+    loadSession().then(() => navigateTo('dashboard'));
   }
 
   // Connect WebSocket

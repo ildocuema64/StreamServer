@@ -59,6 +59,25 @@ async function handleIcecastAuth(req, res) {
     if (stationResult.rows.length > 0) {
       const station = stationResult.rows[0];
       if (station.source_password && pass === station.source_password) {
+        // Verify station owner has active subscription (unless admin-owned legacy)
+        if (station.owner_id) {
+          const owner = await query(
+            'SELECT role FROM users WHERE id = $1 AND is_active = true AND account_status != $2',
+            [station.owner_id, 'blocked']
+          );
+          if (owner.rows.length === 0) {
+            logger.warn(`Auth denied: owner blocked for mount ${normalizedMount}`);
+            return res.status(401).send('Denied');
+          }
+          if (owner.rows[0].role !== 'admin') {
+            const { hasActiveSubscription } = require('../services/subscriptions');
+            const active = await hasActiveSubscription(station.owner_id, owner.rows[0].role);
+            if (!active) {
+              logger.warn(`Auth denied: no subscription for mount ${normalizedMount}`);
+              return res.status(401).send('Denied');
+            }
+          }
+        }
         broadcast('stream', {
           action: 'source_connected',
           station: station.name,

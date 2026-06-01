@@ -27,6 +27,11 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Dashboard</span>
         </a>
+        <a href="#" class="nav-item" data-page="subscription" id="nav-subscription">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span>Assinatura</span>
+          <span class="sub-badge" id="sub-badge" style="display:none;"></span>
+        </a>
         <a href="#" class="nav-item" data-page="stations" id="nav-stations">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg>
           <span>Estações</span>
@@ -46,6 +51,10 @@
         <a href="#" class="nav-item" data-page="djs" id="nav-djs">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>DJs</span>
+        </a>
+        <a href="#" class="nav-item" data-page="admin" id="nav-admin" style="display:none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Admin</span>
         </a>
       </nav>
 
@@ -131,7 +140,7 @@
         </div>
         <div class="panel-body">
           <p style="color:var(--text-muted);margin-bottom:10px;">
-            Guarda estes dados para configurar o teu encoder (BUTT / Mixxx / etc).
+            Após criar conta, escolhe um plano de assinatura para activar a tua estação.
           </p>
           <pre id="signup-connection" style="white-space:pre-wrap;color:var(--text-secondary);font-size:12px;margin:0;">—</pre>
         </div>

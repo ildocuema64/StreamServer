@@ -11,6 +11,7 @@ const { generateToken, generateRefreshToken, verifyToken, authenticate } = requi
 const logger = require('../utils/logger');
 const Joi = require('joi');
 const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig } = require('../utils/streamUrls');
+const { getSubscriptionSummary } = require('../services/subscriptions');
 
 // Validation schemas
 const loginSchema = Joi.object({
@@ -22,9 +23,7 @@ const registerSchema = Joi.object({
   username: Joi.string().min(3).max(50).required(),
   email: Joi.string().email().required(),
   password: Joi.string().min(8).max(128).required(),
-  display_name: Joi.string().max(100),
-  station_slug: Joi.string().max(100).pattern(/^[a-z0-9-]+$/).default('main'),
-  dj_name: Joi.string().max(100)
+  display_name: Joi.string().max(100)
 });
 
 // POST /api/auth/signup (public self-registration)
@@ -33,9 +32,8 @@ router.post('/signup', async (req, res) => {
     const { error, value } = registerSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
 
-    const { username, email, password, display_name, station_slug, dj_name } = value;
+    const { username, email, password, display_name } = value;
 
-    // Check uniqueness
     const existing = await query(
       'SELECT id FROM users WHERE username = $1 OR email = $2',
       [username, email]
@@ -44,35 +42,15 @@ router.post('/signup', async (req, res) => {
       return res.status(409).json({ error: 'Username or email already exists' });
     }
 
-    // Resolve station (default "main")
-    const stationResult = await query(
-      'SELECT id, name, slug, mountpoint, bitrate, format FROM stations WHERE slug = $1 AND is_active = true',
-      [station_slug || 'main']
-    );
-    if (stationResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Station not found' });
-    }
-    const station = stationResult.rows[0];
-
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create user
     const userResult = await query(
-      `INSERT INTO users (username, email, password_hash, display_name, role)
-       VALUES ($1, $2, $3, $4, 'dj')
+      `INSERT INTO users (username, email, password_hash, display_name, role, account_status)
+       VALUES ($1, $2, $3, $4, 'dj', 'active')
        RETURNING id, username, email, display_name, role`,
       [username, email, passwordHash, display_name || username]
     );
     const user = userResult.rows[0];
-
-    // Create DJ profile + stream password
-    const sourcePassword = crypto.randomBytes(12).toString('base64url');
-    const djResult = await query(
-      `INSERT INTO dj_profiles (user_id, station_id, dj_name, bio, source_password, allowed_mountpoints, is_active)
-       VALUES ($1, $2, $3, '', $4, $5, true)
-       RETURNING id, dj_name, allowed_mountpoints`,
-      [user.id, station.id, dj_name || (display_name || username), sourcePassword, [station.mountpoint || '/live']]
-    );
 
     const token = generateToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -83,44 +61,14 @@ router.post('/signup', async (req, res) => {
       [user.id, refreshToken]
     );
 
-    const host = process.env.ICECAST_HOSTNAME || process.env.ICECAST_HOST || 'localhost';
-    const port = parseInt(process.env.ICECAST_PORT) || 8000;
-    const mount = station.mountpoint || '/live';
-
-    const stationWithCreds = {
-      ...station,
-      source_password: sourcePassword,
-      name: station.name
-    };
+    const subscription = await getSubscriptionSummary(user.id, user.role);
 
     res.status(201).json({
       token,
       refreshToken,
       user,
-      streamConnection: {
-        icecast: {
-          host,
-          port,
-          mountpoint: mount,
-          username: 'source',
-          password: sourcePassword,
-          format: station.format || 'mp3',
-          bitrate: station.bitrate || 128
-        },
-        listen_url: buildListenUrl(mount),
-        listen_url_direct: buildDirectListenUrl(mount),
-        player_url: buildPlayerUrl(mount),
-        butt: buildButtConfig(stationWithCreds),
-        station: {
-          id: station.id,
-          name: station.name,
-          slug: station.slug
-        },
-        dj_profile: {
-          id: djResult.rows[0].id,
-          dj_name: djResult.rows[0].dj_name
-        }
-      }
+      subscription,
+      message: 'Conta criada! Escolhe um plano de assinatura para criar a tua estação.'
     });
   } catch (error) {
     if (error.code === '23505') {
@@ -185,6 +133,8 @@ router.post('/login', async (req, res) => {
 
     logger.info(`User logged in: ${user.username}`);
 
+    const subscription = await getSubscriptionSummary(user.id, user.role);
+
     res.json({
       token,
       refreshToken,
@@ -195,7 +145,8 @@ router.post('/login', async (req, res) => {
         display_name: user.display_name,
         role: user.role,
         avatar_url: user.avatar_url
-      }
+      },
+      subscription
     });
   } catch (error) {
     logger.error('Login error:', error);

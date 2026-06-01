@@ -1,8 +1,23 @@
+# Secrets
 .env
 backend/.env
 frontend/.env
+*.pem
+
+# Dependencies
 node_modules/
 backend/node_modules/
 frontend/node_modules/
+
+# Build
+frontend/dist/
+.vercel/
+
+# Logs & OS
 *.log
+/tmp/
 .DS_Store
+
+# Media (local dev)
+/streamserver-media/
+/streamserver-recordings/

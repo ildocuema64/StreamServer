@@ -6,7 +6,10 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { query } = require('../database/connection');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { requireActiveAccount } = require('../middleware/subscription');
+const { canCreateStation } = require('../services/subscriptions');
+const { canAccessStation, ownerFilterClause } = require('../utils/stationAccess');
 const logger = require('../utils/logger');
 const Joi = require('joi');
 const {
@@ -51,14 +54,16 @@ function generateSourcePassword() {
   return crypto.randomBytes(16).toString('base64url');
 }
 
-// GET /api/stations - List all stations
-router.get('/', authenticate, async (req, res) => {
+// GET /api/stations — user's stations (admin sees all)
+router.get('/', authenticate, requireActiveAccount, async (req, res) => {
   try {
+    const { sql, params } = ownerFilterClause(req.user);
     const result = await query(
       `SELECT s.*, 
         (SELECT COUNT(*) FROM dj_profiles dp WHERE dp.station_id = s.id AND dp.is_active = true) as dj_count,
         (SELECT COUNT(*) FROM playlists p WHERE p.station_id = s.id) as playlist_count
-       FROM stations s ORDER BY s.created_at DESC`
+       FROM stations s WHERE 1=1${sql} ORDER BY s.created_at DESC`,
+      params
     );
     res.json(result.rows.map((s) => enrichStation(s)));
   } catch (error) {
@@ -68,11 +73,14 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /api/stations/:id/stream-config - BUTT credentials & public listen URLs
-router.get('/:id/stream-config', authenticate, async (req, res) => {
+router.get('/:id/stream-config', authenticate, requireActiveAccount, async (req, res) => {
   try {
     const result = await query('SELECT * FROM stations WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Station not found' });
+    }
+    if (!canAccessStation(result.rows[0], req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const station = enrichStation(result.rows[0]);
@@ -98,8 +106,14 @@ router.get('/:id/stream-config', authenticate, async (req, res) => {
 });
 
 // POST /api/stations/:id/regenerate-password
-router.post('/:id/regenerate-password', authenticate, authorize('admin', 'manager'), async (req, res) => {
+router.post('/:id/regenerate-password', authenticate, requireActiveAccount, async (req, res) => {
   try {
+    const existing = await query('SELECT * FROM stations WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Station not found' });
+    if (!canAccessStation(existing.rows[0], req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const newPassword = generateSourcePassword();
     const result = await query(
       'UPDATE stations SET source_password = $1 WHERE id = $2 RETURNING *',
@@ -118,11 +132,14 @@ router.post('/:id/regenerate-password', authenticate, authorize('admin', 'manage
 });
 
 // GET /api/stations/:id
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireActiveAccount, async (req, res) => {
   try {
     const result = await query('SELECT * FROM stations WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Station not found' });
+    }
+    if (!canAccessStation(result.rows[0], req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
     }
     res.json(enrichStation(result.rows[0]));
   } catch (error) {
@@ -130,21 +147,27 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/stations
-router.post('/', authenticate, authorize('admin', 'manager'), async (req, res) => {
+// POST /api/stations — requires active subscription
+router.post('/', authenticate, requireActiveAccount, async (req, res) => {
   try {
+    const access = await canCreateStation(req.user.id, req.user.role);
+    if (!access.allowed) {
+      return res.status(402).json({ error: access.reason, code: 'SUBSCRIPTION_REQUIRED' });
+    }
+
     const { error, value } = stationSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
 
     const slug = value.slug || value.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const mountpoint = value.mountpoint || defaultMountForSlug(slug);
     const sourcePassword = generateSourcePassword();
+    const maxListeners = access.subscription?.max_listeners || value.max_listeners;
 
     const result = await query(
-      `INSERT INTO stations (name, slug, description, genre, mountpoint, bitrate, format, is_active, max_listeners, source_password)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      `INSERT INTO stations (name, slug, description, genre, mountpoint, bitrate, format, is_active, max_listeners, source_password, owner_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [value.name, slug, value.description, value.genre, mountpoint,
-       value.bitrate, value.format, value.is_active, value.max_listeners, sourcePassword]
+       value.bitrate, value.format, value.is_active, maxListeners, sourcePassword, req.user.id]
     );
 
     const station = result.rows[0];
@@ -176,8 +199,13 @@ router.post('/', authenticate, authorize('admin', 'manager'), async (req, res) =
 });
 
 // PUT /api/stations/:id
-router.put('/:id', authenticate, authorize('admin', 'manager'), async (req, res) => {
+router.put('/:id', authenticate, requireActiveAccount, async (req, res) => {
   try {
+    const existing = await query('SELECT * FROM stations WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Station not found' });
+    if (!canAccessStation(existing.rows[0], req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     const { error, value } = stationSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
 
@@ -200,8 +228,14 @@ router.put('/:id', authenticate, authorize('admin', 'manager'), async (req, res)
 });
 
 // DELETE /api/stations/:id
-router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+router.delete('/:id', authenticate, requireActiveAccount, async (req, res) => {
   try {
+    const existing = await query('SELECT * FROM stations WHERE id = $1', [req.params.id]);
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'Station not found' });
+    if (!canAccessStation(existing.rows[0], req.user)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     const result = await query('DELETE FROM stations WHERE id = $1 RETURNING id', [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Station not found' });

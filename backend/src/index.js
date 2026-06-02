@@ -39,7 +39,8 @@ const { setupWebSocket } = require('./services/websocket');
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.APP_PORT || 3000;
+// Render/Railway/Fly injectam PORT; localmente usa APP_PORT ou 3000
+const PORT = Number(process.env.PORT || process.env.APP_PORT || 3000);
 
 // =============================================================================
 // Middleware

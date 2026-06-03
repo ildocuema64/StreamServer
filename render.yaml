@@ -1,0 +1,16 @@
+# Blueprint Render — opcional: Dashboard → New → Blueprint → este repo
+services:
+  - type: web
+    name: streamserver-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_DISABLED
+        value: "true"
+      - key: ICECAST_DISABLED
+        value: "true"

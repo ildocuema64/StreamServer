@@ -52,11 +52,22 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 
-// CORS
+// CORS — em produção: APP_URL (frontend) e/ou CORS_ORIGINS (lista separada por vírgula)
+function corsAllowedOrigins() {
+  if (process.env.NODE_ENV !== 'production') return true;
+  const origins = new Set();
+  if (process.env.APP_URL) origins.add(process.env.APP_URL.replace(/\/$/, ''));
+  if (process.env.CORS_ORIGINS) {
+    for (const o of process.env.CORS_ORIGINS.split(',')) {
+      const t = o.trim().replace(/\/$/, '');
+      if (t) origins.add(t);
+    }
+  }
+  return origins.size ? [...origins] : true;
+}
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? [process.env.APP_URL, /\.example\.com$/]
-    : '*',
+  origin: corsAllowedOrigins(),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

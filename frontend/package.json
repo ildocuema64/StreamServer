@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/sync-vercel-rewrites.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

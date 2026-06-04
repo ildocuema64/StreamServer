@@ -1,10 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "name": "streamserver",
   "installCommand": "npm install",
-  "buildCommand": "cd frontend && node scripts/sync-vercel-rewrites.mjs && npm run build",
-  "outputDirectory": "frontend/dist",
+  "buildCommand": "node scripts/sync-vercel-rewrites.mjs && npm run build",
+  "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
     {
@@ -23,7 +22,12 @@
   "headers": [
     {
       "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }

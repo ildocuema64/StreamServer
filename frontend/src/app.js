@@ -130,6 +130,88 @@ export function toast(message, type = 'info') {
   setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 4000);
 }
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  }[m]));
+}
+
+let confirmResolve = null;
+
+function closeConfirmModal(result) {
+  const modal = document.getElementById('confirm-modal');
+  modal?.classList.remove('active');
+  if (confirmResolve) {
+    const resolve = confirmResolve;
+    confirmResolve = null;
+    resolve(result);
+  }
+}
+
+export function confirmDialog({
+  title = 'Confirmar',
+  message = '',
+  detail = '',
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  danger = false
+} = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirm-modal');
+    const titleEl = document.getElementById('confirm-modal-title');
+    const messageEl = document.getElementById('confirm-modal-message');
+    const detailEl = document.getElementById('confirm-modal-detail');
+    const okBtn = document.getElementById('confirm-modal-ok');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+    if (!modal || !titleEl || !messageEl || !detailEl || !okBtn || !cancelBtn) {
+      resolve(false);
+      return;
+    }
+
+    confirmResolve = resolve;
+    titleEl.textContent = title;
+    messageEl.innerHTML = message;
+    detailEl.textContent = detail;
+    detailEl.style.display = detail ? 'block' : 'none';
+    okBtn.textContent = confirmText;
+    cancelBtn.textContent = cancelText;
+    okBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+
+    modal.classList.add('active');
+    okBtn.focus();
+  });
+}
+
+export function confirmDeleteStation(name, detail = '') {
+  const safeName = escapeHtml(name || 'esta estação');
+  return confirmDialog({
+    title: 'Remover estação',
+    message: `Remover a estação <span class="confirm-highlight">"${safeName}"</span> permanentemente?`,
+    detail,
+    confirmText: 'Remover',
+    cancelText: 'Cancelar',
+    danger: true
+  });
+}
+
+function initConfirmModal() {
+  const modal = document.getElementById('confirm-modal');
+  const okBtn = document.getElementById('confirm-modal-ok');
+  const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+  okBtn?.addEventListener('click', () => closeConfirmModal(true));
+  cancelBtn?.addEventListener('click', () => closeConfirmModal(false));
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) closeConfirmModal(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+      closeConfirmModal(false);
+    }
+  });
+}
+
 // =============================================================================
 // Auth
 // =============================================================================
@@ -279,6 +361,7 @@ function navigateTo(page) {
 // Init
 // =============================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  initConfirmModal();
   document.getElementById('toggle-register')?.addEventListener('click', () => setAuthMode('signup'));
   document.getElementById('toggle-login')?.addEventListener('click', () => setAuthMode('login'));
 

@@ -2,7 +2,7 @@
 // Stations Page - Create stations, stream URLs & BUTT credentials
 // =============================================================================
 
-import { api, toast, getSubscription } from '../app.js';
+import { api, toast, getSubscription, confirmDeleteStation } from '../app.js';
 
 export function renderStations(container) {
   container.innerHTML = `
@@ -164,6 +164,8 @@ async function loadStations() {
       return;
     }
 
+    const isAdmin = getSubscription()?.isAdmin;
+
     tbody.innerHTML = stations.map((s) => {
       const badge = s.is_active ? 'badge-success' : 'badge-warning';
       const label = s.is_active ? 'ativa' : 'inativa';
@@ -179,7 +181,10 @@ async function loadStations() {
           <td>${escapeHtml((s.format || 'mp3').toUpperCase())} ${escapeHtml(String(s.bitrate || 128))}k</td>
           <td><span class="badge ${badge}">${label}</span></td>
           <td>
-            <button class="btn btn-outline btn-sm btn-show-creds" data-id="${s.id}">Credenciais</button>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button class="btn btn-outline btn-sm btn-show-creds" data-id="${s.id}">Credenciais</button>
+              ${isAdmin ? `<button class="btn btn-outline btn-sm btn-delete-station" data-id="${s.id}" style="color:var(--danger);">Remover</button>` : ''}
+            </div>
           </td>
         </tr>
       `;
@@ -187,6 +192,9 @@ async function loadStations() {
 
     tbody.querySelectorAll('.btn-show-creds').forEach((btn) => {
       btn.addEventListener('click', () => showCredentials(btn.dataset.id));
+    });
+    tbody.querySelectorAll('.btn-delete-station').forEach((btn) => {
+      btn.addEventListener('click', () => deleteStation(btn.dataset.id, btn.closest('tr')?.querySelector('td')?.textContent?.trim()));
     });
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger);padding:16px;">Falha: ${escapeHtml(e.message || 'erro')}</td></tr>`;
@@ -240,6 +248,18 @@ async function showCredentials(stationId) {
     showCredentialsFromData({ ...config.station, ...config, icecast: config.icecast, butt: config.butt, listen_url: config.listen_url });
   } catch (e) {
     toast(e.message || 'Falha ao carregar credenciais', 'error');
+  }
+}
+
+async function deleteStation(stationId, name) {
+  const ok = await confirmDeleteStation(name);
+  if (!ok) return;
+  try {
+    await api(`/admin/stations/${stationId}`, { method: 'DELETE' });
+    toast('Estação removida', 'warning');
+    await loadStations();
+  } catch (e) {
+    toast(e.message || 'Falha ao remover estação', 'error');
   }
 }
 

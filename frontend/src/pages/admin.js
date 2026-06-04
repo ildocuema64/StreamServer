@@ -2,7 +2,7 @@
 // Admin Panel — user & subscription management
 // =============================================================================
 
-import { api, toast } from '../app.js';
+import { api, toast, confirmDeleteStation } from '../app.js';
 
 let plans = [];
 
@@ -37,9 +37,34 @@ export function renderAdmin(container) {
         </table>
       </div>
     </div>
+    <div class="panel" style="margin-top:16px;">
+      <div class="panel-header">
+        <span class="panel-title">📻 Gestão de Estações</span>
+        <button class="btn btn-outline btn-sm" id="btn-refresh-stations-admin">Atualizar</button>
+      </div>
+      <div class="panel-body" style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Mount</th>
+              <th>Proprietário</th>
+              <th>Formato</th>
+              <th>DJs</th>
+              <th>Estado</th>
+              <th>Acções</th>
+            </tr>
+          </thead>
+          <tbody id="admin-stations-tbody">
+            <tr><td colspan="7" style="padding:16px;color:var(--text-muted);">A carregar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   `;
 
   document.getElementById('btn-refresh-admin')?.addEventListener('click', loadAdmin);
+  document.getElementById('btn-refresh-stations-admin')?.addEventListener('click', loadAdminStations);
   loadAdmin();
 }
 
@@ -94,8 +119,50 @@ async function loadAdmin() {
     tbody.querySelectorAll('.btn-grant').forEach((b) => b.addEventListener('click', () => grantPlan(b.dataset.id)));
     tbody.querySelectorAll('.btn-revoke').forEach((b) => b.addEventListener('click', () => revokeSub(b.dataset.id)));
     tbody.querySelectorAll('.btn-delete').forEach((b) => b.addEventListener('click', () => deleteUser(b.dataset.id)));
+
+    await loadAdminStations();
   } catch (e) {
     toast(e.message || 'Erro admin', 'error');
+  }
+}
+
+async function loadAdminStations() {
+  const tbody = document.getElementById('admin-stations-tbody');
+  if (!tbody) return;
+
+  try {
+    const stations = await api('/admin/stations');
+    if (!stations.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:16px;color:var(--text-muted);">Sem estações.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = stations.map((s) => {
+      const badge = s.is_active ? 'badge-success' : 'badge-warning';
+      const label = s.is_active ? 'activa' : 'inactiva';
+      return `
+        <tr>
+          <td style="font-weight:700;">${escapeHtml(s.name)}</td>
+          <td><code>${escapeHtml(s.mountpoint || '/live')}</code></td>
+          <td>${escapeHtml(s.owner_username || '—')}</td>
+          <td>${escapeHtml((s.format || 'mp3').toUpperCase())} ${escapeHtml(String(s.bitrate || 128))}k</td>
+          <td>${s.dj_count || 0}</td>
+          <td><span class="badge ${badge}">${label}</span></td>
+          <td>
+            <button class="btn btn-outline btn-sm btn-delete-station" data-id="${s.id}" style="color:var(--danger);">Remover</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('.btn-delete-station').forEach((b) => {
+      b.addEventListener('click', () => {
+        const name = b.closest('tr')?.querySelector('td')?.textContent?.trim() || 'esta estação';
+        deleteStation(b.dataset.id, name);
+      });
+    });
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:16px;color:var(--danger);">${escapeHtml(e.message || 'Erro')}</td></tr>`;
   }
 }
 
@@ -149,6 +216,21 @@ async function deleteUser(id) {
     await api(`/admin/users/${id}`, { method: 'DELETE' });
     toast('Utilizador removido', 'warning');
     loadAdmin();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteStation(id, name) {
+  const ok = await confirmDeleteStation(
+    name,
+    'Playlists e DJs associados serão apagados.'
+  );
+  if (!ok) return;
+  try {
+    await api(`/admin/stations/${id}`, { method: 'DELETE' });
+    toast('Estação removida', 'warning');
+    loadAdminStations();
+    const overview = await api('/admin/overview');
+    document.getElementById('adm-stations').textContent = overview.stations ?? 0;
   } catch (e) { toast(e.message, 'error'); }
 }
 

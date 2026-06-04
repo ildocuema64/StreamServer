@@ -4,7 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { query } = require('../database/connection');
+const { query, getClient } = require('../database/connection');
 const { authenticate, authorize } = require('../middleware/auth');
 const {
   activateSubscription,
@@ -92,18 +92,34 @@ router.post('/users/:id/unblock', async (req, res) => {
 
 // DELETE /api/admin/users/:id
 router.delete('/users/:id', async (req, res) => {
+  const client = await getClient();
   try {
-    const result = await query(
-      `DELETE FROM users WHERE id = $1 AND role != 'admin' RETURNING id, username`,
+    const existing = await client.query(
+      `SELECT id, username FROM users WHERE id = $1 AND role != 'admin'`,
       [req.params.id]
     );
-    if (result.rows.length === 0) {
+    if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    await logAdminAction(req.user.id, req.params.id, 'delete_user', {});
+    const { id, username } = existing.rows[0];
+
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO admin_audit_log (admin_id, target_user_id, action, details) VALUES ($1, $2, $3, $4)`,
+      [req.user.id, id, 'delete_user', JSON.stringify({ username })]
+    );
+    await client.query('UPDATE playlists SET created_by = NULL WHERE created_by = $1', [id]);
+    await client.query('UPDATE media_files SET uploaded_by = NULL WHERE uploaded_by = $1', [id]);
+    await client.query('DELETE FROM users WHERE id = $1', [id]);
+    await client.query('COMMIT');
+
     res.json({ message: 'Utilizador removido' });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    logger.error('Admin delete user error:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  } finally {
+    client.release();
   }
 });
 
@@ -139,6 +155,54 @@ router.delete('/users/:id/subscription', async (req, res) => {
     res.json({ message: 'Assinatura revogada' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to revoke subscription' });
+  }
+});
+
+// GET /api/admin/stations
+router.get('/stations', async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT s.id, s.name, s.slug, s.mountpoint, s.format, s.bitrate, s.is_active,
+              s.owner_id, s.created_at,
+              u.username AS owner_username,
+              (SELECT COUNT(*) FROM dj_profiles dp WHERE dp.station_id = s.id) AS dj_count
+       FROM stations s
+       LEFT JOIN users u ON s.owner_id = u.id
+       ORDER BY s.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    logger.error('Admin list stations error:', error);
+    res.status(500).json({ error: 'Failed to list stations' });
+  }
+});
+
+// DELETE /api/admin/stations/:id
+router.delete('/stations/:id', async (req, res) => {
+  try {
+    const existing = await query(
+      `SELECT s.id, s.name, s.owner_id, u.username AS owner_username
+       FROM stations s
+       LEFT JOIN users u ON s.owner_id = u.id
+       WHERE s.id = $1`,
+      [req.params.id]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Station not found' });
+    }
+    const station = existing.rows[0];
+
+    await query('DELETE FROM stations WHERE id = $1', [req.params.id]);
+    await logAdminAction(req.user.id, station.owner_id, 'delete_station', {
+      station_id: station.id,
+      station_name: station.name,
+      owner_username: station.owner_username
+    });
+
+    res.json({ message: 'Estação removida' });
+  } catch (error) {
+    logger.error('Admin delete station error:', error);
+    res.status(500).json({ error: 'Failed to delete station' });
   }
 });
 

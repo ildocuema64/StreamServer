@@ -58,7 +58,22 @@ function updateNavVisibility() {
 // =============================================================================
 // API Helper
 // =============================================================================
-const API_BASE = '/api';
+/** Produção: VITE_BACKEND_URL (Render). Dev: proxy Vite em /api */
+function resolveBackendOrigin() {
+  const raw = import.meta.env.VITE_BACKEND_URL?.trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const h = u.hostname;
+    if (h === 'YOUR_API_DOMAIN' || h === 'localhost' || h === '127.0.0.1') return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+const BACKEND_ORIGIN = resolveBackendOrigin();
+const API_BASE = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api` : '/api';
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem('token');
@@ -170,8 +185,20 @@ function setAuthMode(mode) {
 let ws = null;
 
 function connectWebSocket() {
-  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${protocol}://${location.host}/ws`);
+  let url;
+  const wsEnv = import.meta.env.VITE_BACKEND_WS?.trim();
+  if (wsEnv) {
+    url = wsEnv.endsWith('/ws') ? wsEnv : `${wsEnv.replace(/\/$/, '')}/ws`;
+  } else if (BACKEND_ORIGIN) {
+    const u = new URL(BACKEND_ORIGIN);
+    u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+    u.pathname = '/ws';
+    url = u.href;
+  } else {
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    url = `${protocol}://${location.host}/ws`;
+  }
+  ws = new WebSocket(url);
 
   ws.onmessage = (event) => {
     try {

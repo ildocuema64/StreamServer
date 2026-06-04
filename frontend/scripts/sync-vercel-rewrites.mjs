@@ -9,20 +9,37 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const vercelPath = path.join(__dirname, '..', 'vercel.json');
 
+const isVercel = process.env.VERCEL === '1';
 const raw = (process.env.VITE_BACKEND_URL || process.env.BACKEND_URL || '').trim();
+
+function fail(msg) {
+  console.error(`[vercel] ${msg}`);
+  process.exit(1);
+}
+
 if (!raw) {
-  console.warn(
-    '[vercel] VITE_BACKEND_URL não definido — /api em produção usará o placeholder em vercel.json (login falhará).'
-  );
+  if (isVercel) fail('VITE_BACKEND_URL em falta. Vercel → Settings → Environment Variables → URL do Render (https://….onrender.com).');
+  console.warn('[vercel] VITE_BACKEND_URL não definido — skip rewrites (dev local).');
   process.exit(0);
 }
 
 let base;
 try {
-  base = new URL(raw).origin;
+  const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  base = new URL(normalized).origin;
 } catch {
-  console.error('[vercel] VITE_BACKEND_URL inválido:', raw);
-  process.exit(1);
+  fail(`VITE_BACKEND_URL inválido: "${raw}"`);
+}
+
+const host = new URL(base).hostname;
+const blocked = ['YOUR_API_DOMAIN', 'localhost', '127.0.0.1', '0.0.0.0'];
+if (blocked.includes(host)) {
+  fail(
+    `VITE_BACKEND_URL aponta para "${host}". Na Vercel usa a URL pública do Render, não localhost nem placeholder.`
+  );
+}
+if (!host.includes('.')) {
+  fail(`Hostname inválido em VITE_BACKEND_URL: "${host}"`);
 }
 
 const cfg = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));

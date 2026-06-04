@@ -255,7 +255,7 @@ async function deleteStation(stationId, name) {
   const ok = await confirmDeleteStation(name);
   if (!ok) return;
   try {
-    await api(`/admin/stations/${stationId}`, { method: 'DELETE' });
+    await api(`/stations/${stationId}`, { method: 'DELETE' });
     toast('Estação removida', 'warning');
     await loadStations();
   } catch (e) {

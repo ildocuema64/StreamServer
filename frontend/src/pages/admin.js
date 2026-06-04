@@ -131,7 +131,13 @@ async function loadAdminStations() {
   if (!tbody) return;
 
   try {
-    const stations = await api('/admin/stations');
+    let stations;
+    try {
+      stations = await api('/admin/stations');
+    } catch (e) {
+      if (e.status !== 404) throw e;
+      stations = await api('/stations');
+    }
     if (!stations.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="padding:16px;color:var(--text-muted);">Sem estações.</td></tr>`;
       return;
@@ -226,7 +232,7 @@ async function deleteStation(id, name) {
   );
   if (!ok) return;
   try {
-    await api(`/admin/stations/${id}`, { method: 'DELETE' });
+    await api(`/stations/${id}`, { method: 'DELETE' });
     toast('Estação removida', 'warning');
     loadAdminStations();
     const overview = await api('/admin/overview');

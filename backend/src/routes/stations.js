@@ -9,7 +9,7 @@ const { query } = require('../database/connection');
 const { authenticate } = require('../middleware/auth');
 const { requireActiveAccount } = require('../middleware/subscription');
 const { canCreateStation } = require('../services/subscriptions');
-const { canAccessStation, ownerFilterClause } = require('../utils/stationAccess');
+const { canAccessStation, ownerFilterClause, isAdmin } = require('../utils/stationAccess');
 const logger = require('../utils/logger');
 const Joi = require('joi');
 const {
@@ -59,11 +59,15 @@ function generateSourcePassword() {
 router.get('/', authenticate, requireActiveAccount, async (req, res) => {
   try {
     const { sql, params } = ownerFilterClause(req.user);
+    const admin = isAdmin(req.user);
     const result = await query(
-      `SELECT s.*, 
+      `SELECT s.*,
         (SELECT COUNT(*) FROM dj_profiles dp WHERE dp.station_id = s.id AND dp.is_active = true) as dj_count,
         (SELECT COUNT(*) FROM playlists p WHERE p.station_id = s.id) as playlist_count
-       FROM stations s WHERE 1=1${sql} ORDER BY s.created_at DESC`,
+        ${admin ? ', u.username AS owner_username' : ''}
+       FROM stations s
+       ${admin ? 'LEFT JOIN users u ON s.owner_id = u.id' : ''}
+       WHERE 1=1${sql} ORDER BY s.created_at DESC`,
       params
     );
     res.json(result.rows.map((s) => enrichStation(s, { origin: getRequestPublicOrigin(req) })));

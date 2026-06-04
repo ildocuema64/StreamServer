@@ -7,7 +7,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const vercelPath = path.join(__dirname, '..', 'vercel.json');
+const vercelPaths = [
+  path.join(__dirname, '..', 'vercel.json'),
+  path.join(__dirname, '..', '..', 'vercel.json')
+].filter((p) => fs.existsSync(p));
 
 const isVercel = process.env.VERCEL === '1';
 const raw = (process.env.VITE_BACKEND_URL || process.env.BACKEND_URL || '').trim();
@@ -42,16 +45,23 @@ if (!host.includes('.')) {
   fail(`Hostname inválido em VITE_BACKEND_URL: "${host}"`);
 }
 
-const cfg = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
-const apiRewrites = [
-  { source: '/api/(.*)', destination: `${base}/api/$1` },
-  { source: '/ws', destination: `${base}/ws` },
-];
-const spaRewrite = cfg.rewrites?.find((r) => r.source?.includes('index.html')) ?? {
-  source: '/((?!assets/).*)',
-  destination: '/index.html',
-};
-cfg.rewrites = [...apiRewrites, spaRewrite];
+if (!vercelPaths.length) {
+  console.warn('[vercel] vercel.json não encontrado — skip rewrites.');
+  process.exit(0);
+}
 
-fs.writeFileSync(vercelPath, `${JSON.stringify(cfg, null, 2)}\n`);
-console.log('[vercel] Rewrites /api e /ws →', base);
+for (const vercelPath of vercelPaths) {
+  const cfg = JSON.parse(fs.readFileSync(vercelPath, 'utf8'));
+  const apiRewrites = [
+    { source: '/api/(.*)', destination: `${base}/api/$1` },
+    { source: '/ws', destination: `${base}/ws` },
+    { source: '/stream/(.*)', destination: `${base}/stream/$1` },
+  ];
+  const spaRewrite = cfg.rewrites?.find((r) => r.source?.includes('index.html')) ?? {
+    source: '/((?!assets/).*)',
+    destination: '/index.html',
+  };
+  cfg.rewrites = [...apiRewrites, spaRewrite];
+  fs.writeFileSync(vercelPath, `${JSON.stringify(cfg, null, 2)}\n`);
+  console.log('[vercel] Rewrites /api, /ws e /stream →', base, `(${path.relative(process.cwd(), vercelPath)})`);
+}

@@ -12,5 +12,16 @@ services:
         value: production
       - key: REDIS_DISABLED
         value: "true"
+      # Icecast: false se tiveres servidor Icecast acessível (define ICECAST_HOST)
       - key: ICECAST_DISABLED
-        value: "true"
+        value: "false"
+      # Obrigatório — URL HTTPS do frontend na Vercel (URLs públicas de ouvir online)
+      # - key: APP_URL
+      #   sync: false
+      # - key: PUBLIC_STREAM_URL
+      #   sync: false
+      # Host público do Icecast para o BUTT transmitir (não uses localhost)
+      # - key: PUBLIC_ICECAST_HOST
+      #   sync: false
+      # - key: ICECAST_HOST
+      #   sync: false

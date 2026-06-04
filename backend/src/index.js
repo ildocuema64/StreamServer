@@ -33,6 +33,8 @@ const internalRoutes = require('./routes/internal');
 const healthRoutes = require('./routes/health');
 const adminRoutes = require('./routes/admin');
 const subscriptionRoutes = require('./routes/subscriptions');
+const { mountIcecastProxy } = require('./middleware/icecastProxy');
+const { logStreamUrlConfig } = require('./utils/streamUrls');
 
 // WebSocket handler
 const { setupWebSocket } = require('./services/websocket');
@@ -96,8 +98,11 @@ const globalLimiter = rateLimit({
 
 app.use('/api/', globalLimiter);
 
-// Trust proxy (behind nginx)
+// Trust proxy (behind nginx / Render / Vercel)
 app.set('trust proxy', 1);
+
+// Icecast stream proxy (/stream/*) — before API routes
+mountIcecastProxy(app);
 
 // =============================================================================
 // Routes
@@ -170,6 +175,8 @@ async function start() {
     // Start scheduler
     startScheduler();
     logger.info('✅ Scheduler started');
+
+    logStreamUrlConfig();
 
     // Start HTTP server
     server.listen(PORT, '0.0.0.0', () => {

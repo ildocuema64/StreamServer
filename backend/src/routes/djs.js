@@ -8,7 +8,7 @@ const bcrypt = require('bcryptjs');
 const { query } = require('../database/connection');
 const { authenticate, authorize } = require('../middleware/auth');
 const logger = require('../utils/logger');
-const { buildButtConfig } = require('../utils/streamUrls');
+const { buildButtConfig, getRequestPublicOrigin } = require('../utils/streamUrls');
 
 // GET /api/djs - List all DJ profiles
 router.get('/', authenticate, async (req, res) => {
@@ -133,7 +133,7 @@ router.get('/:id/butt-config', authenticate, async (req, res) => {
       format: dj.format,
       bitrate: dj.bitrate,
       dj_name: dj.dj_name
-    });
+    }, { origin: getRequestPublicOrigin(req) });
 
     res.json(buttConfig);
   } catch (error) {

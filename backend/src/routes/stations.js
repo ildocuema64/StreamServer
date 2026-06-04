@@ -14,7 +14,8 @@ const logger = require('../utils/logger');
 const Joi = require('joi');
 const {
   enrichStation,
-  defaultMountForSlug
+  defaultMountForSlug,
+  getRequestPublicOrigin
 } = require('../utils/streamUrls');
 
 const stationSchema = Joi.object({
@@ -65,7 +66,7 @@ router.get('/', authenticate, requireActiveAccount, async (req, res) => {
        FROM stations s WHERE 1=1${sql} ORDER BY s.created_at DESC`,
       params
     );
-    res.json(result.rows.map((s) => enrichStation(s)));
+    res.json(result.rows.map((s) => enrichStation(s, { origin: getRequestPublicOrigin(req) })));
   } catch (error) {
     logger.error('Get stations error:', error);
     res.status(500).json({ error: 'Failed to fetch stations' });
@@ -83,7 +84,7 @@ router.get('/:id/stream-config', authenticate, requireActiveAccount, async (req,
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    const station = enrichStation(result.rows[0]);
+    const station = enrichStation(result.rows[0], { origin: getRequestPublicOrigin(req) });
     res.json({
       station: {
         id: station.id,
@@ -125,7 +126,7 @@ router.post('/:id/regenerate-password', authenticate, requireActiveAccount, asyn
     }
 
     logger.info(`Station password regenerated: ${result.rows[0].name} by ${req.user.username}`);
-    res.json(enrichStation(result.rows[0]));
+    res.json(enrichStation(result.rows[0], { origin: getRequestPublicOrigin(req) }));
   } catch (error) {
     res.status(500).json({ error: 'Failed to regenerate password' });
   }
@@ -141,7 +142,7 @@ router.get('/:id', authenticate, requireActiveAccount, async (req, res) => {
     if (!canAccessStation(result.rows[0], req.user)) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    res.json(enrichStation(result.rows[0]));
+    res.json(enrichStation(result.rows[0], { origin: getRequestPublicOrigin(req) }));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch station' });
   }
@@ -188,7 +189,7 @@ router.post('/', authenticate, requireActiveAccount, async (req, res) => {
     }
 
     logger.info(`Station created: ${value.name} (${mountpoint}) by ${req.user.username}`);
-    res.status(201).json(enrichStation(station));
+    res.status(201).json(enrichStation(station, { origin: getRequestPublicOrigin(req) }));
   } catch (error) {
     if (error.code === '23505') {
       return res.status(409).json({ error: 'Station slug already exists' });
@@ -221,7 +222,7 @@ router.put('/:id', authenticate, requireActiveAccount, async (req, res) => {
       return res.status(404).json({ error: 'Station not found' });
     }
 
-    res.json(enrichStation(result.rows[0]));
+    res.json(enrichStation(result.rows[0], { origin: getRequestPublicOrigin(req) }));
   } catch (error) {
     res.status(500).json({ error: 'Failed to update station' });
   }

@@ -15,6 +15,10 @@
       "destination": "https://YOUR_API_DOMAIN/ws"
     },
     {
+      "source": "/stream/(.*)",
+      "destination": "https://YOUR_API_DOMAIN/stream/$1"
+    },
+    {
       "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }

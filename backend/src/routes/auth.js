@@ -10,7 +10,7 @@ const { query } = require('../database/connection');
 const { generateToken, generateRefreshToken, verifyToken, authenticate } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const Joi = require('joi');
-const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig } = require('../utils/streamUrls');
+const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig, getRequestPublicOrigin } = require('../utils/streamUrls');
 const { getSubscriptionSummary } = require('../services/subscriptions');
 
 // Validation schemas
@@ -274,8 +274,7 @@ router.get('/stream-connection', authenticate, async (req, res) => {
     }
 
     const row = dj.rows[0];
-    const host = process.env.ICECAST_HOSTNAME || process.env.ICECAST_HOST || 'localhost';
-    const port = parseInt(process.env.ICECAST_PORT, 10) || 8000;
+    const urlContext = { origin: getRequestPublicOrigin(req) };
     const mount = row.mountpoint || '/live';
 
     const stationForButt = {
@@ -290,18 +289,18 @@ router.get('/stream-connection', authenticate, async (req, res) => {
     res.json({
       streamConnection: {
         icecast: {
-          host,
-          port,
+          host: process.env.PUBLIC_ICECAST_HOST || process.env.ICECAST_HOSTNAME || process.env.ICECAST_HOST || 'localhost',
+          port: parseInt(process.env.ICECAST_PORT, 10) || 8000,
           mountpoint: mount,
           username: row.source_username || 'source',
           password: row.source_password,
           format: row.format || 'mp3',
           bitrate: row.bitrate || 128
         },
-        listen_url: buildListenUrl(mount),
+        listen_url: buildListenUrl(mount, urlContext),
         listen_url_direct: buildDirectListenUrl(mount),
-        player_url: buildPlayerUrl(mount),
-        butt: buildButtConfig(stationForButt),
+        player_url: buildPlayerUrl(mount, urlContext),
+        butt: buildButtConfig(stationForButt, urlContext),
         station: { name: row.station_name }
       }
     });

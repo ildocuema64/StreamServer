@@ -24,7 +24,7 @@ router.get('/stations', async (req, res) => {
        ORDER BY name`
     );
 
-    const stations = result.rows.map(enrichStationPublic);
+    const stations = result.rows.map((row) => enrichStationPublic(row));
     await cacheSet('public:stations', stations, 60);
     res.json(stations);
   } catch (error) {

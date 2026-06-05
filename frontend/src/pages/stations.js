@@ -2,7 +2,7 @@
 // Stations Page - Create stations, stream URLs & BUTT credentials
 // =============================================================================
 
-import { api, toast, getSubscription, confirmDeleteStation, withButtonLoading } from '../app.js';
+import { api, toast, getSubscription, confirmDeleteStation, withButtonLoading, translateMessage } from '../app.js';
 
 export function renderStations(container) {
   container.innerHTML = `
@@ -246,7 +246,7 @@ async function handleCreateStation(e) {
       await loadStations();
       showCredentialsFromData(station);
     } catch (err) {
-      errEl.textContent = err.message || 'Erro ao criar estação';
+      errEl.textContent = translateMessage(err.message) || 'Erro ao criar estação';
     }
   }, 'A criar...');
 }

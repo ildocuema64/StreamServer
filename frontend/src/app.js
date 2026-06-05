@@ -49,7 +49,7 @@ function updateUserUI(user) {
   const name = document.querySelector('.user-name');
   const role = document.querySelector('.user-role');
   if (avatar) avatar.textContent = (user.username || 'A')[0].toUpperCase();
-  if (name) name.textContent = user.username || 'User';
+  if (name) name.textContent = user.username || 'Utilizador';
   if (role) role.textContent = user.role === 'admin' ? 'Administrador' : 'Utilizador';
 }
 
@@ -86,6 +86,106 @@ const API_BASE = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api` : '/api';
 
 const PUBLIC_AUTH_PATHS = new Set(['/auth/login', '/auth/signup', '/auth/refresh']);
 
+/** Mensagens da API (inglês) → português para alertas e toasts */
+const API_MESSAGES_PT = {
+  'Invalid credentials': 'Credenciais inválidas',
+  'Token expired': 'Sessão expirada',
+  'Invalid token': 'Sessão inválida',
+  'Session expired': 'Sessão expirada',
+  'Authentication required': 'Autenticação necessária',
+  'Authentication failed': 'Falha na autenticação',
+  'User not found': 'Utilizador não encontrado',
+  'Invalid refresh token': 'Token de renovação inválido',
+  'Refresh token expired or revoked': 'Token de renovação expirado ou revogado',
+  'Refresh token required': 'Token de renovação em falta',
+  'Login failed': 'Falha no login',
+  'Logout failed': 'Falha ao terminar sessão',
+  'Signup failed': 'Falha ao criar conta',
+  'Registration failed': 'Falha no registo',
+  'Access denied': 'Acesso negado',
+  'Insufficient permissions': 'Permissões insuficientes',
+  'Forbidden': 'Acesso proibido',
+  'Route not found': 'Rota não encontrada',
+  'Too many requests, please try again later.': 'Demasiados pedidos. Tenta novamente mais tarde.',
+  'Method not allowed': 'Método não permitido',
+  'Stream server unavailable': 'Servidor de stream indisponível',
+  'Station not found': 'Estação não encontrada',
+  'Station slug already exists': 'Este identificador de estação já existe',
+  'Username or email already exists': 'Utilizador ou e-mail já existente',
+  'Account already exists': 'Conta já existente',
+  'Only admins can create users': 'Apenas administradores podem criar utilizadores',
+  'Failed to load stream credentials': 'Falha ao carregar credenciais de stream',
+  'Failed to get user profile': 'Falha ao obter perfil',
+  'Failed to fetch stations': 'Falha ao carregar estações',
+  'Failed to fetch stream status': 'Falha ao obter estado do stream',
+  'Failed to start AutoDJ': 'Falha ao iniciar AutoDJ',
+  'Failed to stop AutoDJ': 'Falha ao parar AutoDJ',
+  'Failed to skip track': 'Falha ao saltar faixa',
+  'Failed to start recording': 'Falha ao iniciar gravação',
+  'Failed to stop recording': 'Falha ao parar gravação',
+  'Failed to fetch schedule': 'Falha ao carregar agenda',
+  'Failed to fetch media files': 'Falha ao carregar ficheiros multimédia',
+  'Failed to fetch DJ profiles': 'Falha ao carregar DJs',
+  'Failed to fetch plans': 'Falha ao carregar planos',
+  'Failed to fetch subscription': 'Falha ao carregar assinatura',
+  'Failed to list users': 'Falha ao listar utilizadores',
+  'Failed to fetch overview': 'Falha ao carregar resumo',
+  'No files uploaded': 'Nenhum ficheiro enviado',
+  'Track skipped': 'Faixa saltada'
+};
+
+const FAILED_TO_PT = {
+  'fetch stations': 'carregar estações',
+  'fetch stream status': 'obter estado do stream',
+  'fetch stream configuration': 'carregar configuração de stream',
+  'fetch schedule': 'carregar agenda',
+  'fetch media files': 'carregar ficheiros multimédia',
+  'fetch DJ profiles': 'carregar DJs',
+  'fetch realtime stats': 'carregar estatísticas em tempo real',
+  'fetch listener stats': 'carregar estatísticas de ouvintes',
+  'fetch overview stats': 'carregar resumo',
+  'create station': 'criar estação',
+  'delete station': 'remover estação',
+  'update station': 'actualizar estação',
+  'regenerate password': 'regenerar palavra-passe',
+  'list users': 'listar utilizadores',
+  'block user': 'bloquear utilizador',
+  'unblock user': 'desbloquear utilizador',
+  'delete user': 'remover utilizador',
+  'fetch plans': 'carregar planos',
+  'fetch subscription': 'carregar assinatura',
+  'upload proof': 'enviar comprovativo',
+  'start AutoDJ': 'iniciar AutoDJ',
+  'stop AutoDJ': 'parar AutoDJ',
+  'skip track': 'saltar faixa',
+  'start recording': 'iniciar gravação',
+  'stop recording': 'parar gravação',
+  'kick source': 'desligar fonte',
+  'update metadata': 'actualizar metadados',
+  'load stream credentials': 'carregar credenciais de stream',
+  'get user profile': 'obter perfil'
+};
+
+export function translateMessage(msg) {
+  if (!msg || typeof msg !== 'string') return msg;
+  const trimmed = msg.trim();
+  if (API_MESSAGES_PT[trimmed]) return API_MESSAGES_PT[trimmed];
+
+  const reqFail = trimmed.match(/^Request failed \((\d+)\)$/);
+  if (reqFail) return `Pedido falhou (${reqFail[1]})`;
+
+  const uploadFail = trimmed.match(/^Upload failed:\s*(.+)$/i);
+  if (uploadFail) return `Falha no envio: ${uploadFail[1]}`;
+
+  const failedTo = trimmed.match(/^Failed to (.+)$/i);
+  if (failedTo) {
+    const key = failedTo[1].toLowerCase();
+    return `Falha ao ${FAILED_TO_PT[key] || key}`;
+  }
+
+  return trimmed;
+}
+
 function parseResponseBody(raw) {
   if (!raw?.trim()) return null;
   try {
@@ -106,7 +206,7 @@ let refreshInFlight = null;
 
 async function refreshSession() {
   const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) throw new Error('No refresh token');
+  if (!refreshToken) throw new Error('Token de renovação em falta');
 
   if (!refreshInFlight) {
     refreshInFlight = fetch(`${API_BASE}/auth/refresh`, {
@@ -146,9 +246,10 @@ export async function api(path, options = {}) {
 
   if (res.status === 401) {
     if (isPublicAuth) {
-      const msg =
+      const msg = translateMessage(
         data?.error ||
-        (path === '/auth/login' ? 'Credenciais inválidas' : 'Pedido não autorizado');
+        (path === '/auth/login' ? 'Credenciais inválidas' : 'Pedido não autorizado')
+      );
       const err = new Error(msg);
       err.status = 401;
       throw err;
@@ -173,13 +274,13 @@ export async function api(path, options = {}) {
   }
 
   if (!res.ok) {
-    const msg =
+    const rawMsg =
       (data && (data.error || data.message || data.details)) ||
       (raw && raw.trim()) ||
       (res.status === 500 && !raw.trim()
         ? 'Servidor indisponível. Confirma que o backend está a correr (npm run dev:backend).'
         : `Request failed (${res.status})`);
-    const err = new Error(msg);
+    const err = new Error(translateMessage(rawMsg));
     err.status = res.status;
     err.response = data;
     console.error('[API]', path, res.status, data || raw || '(empty body)');
@@ -196,7 +297,7 @@ export function toast(message, type = 'info') {
   const container = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.textContent = message;
+  el.textContent = translateMessage(message);
   container.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 4000);
 }
@@ -384,7 +485,7 @@ function handleWSMessage(msg) {
   if (msg.type === 'metadata') {
     const npTitle = document.getElementById('np-title');
     const npArtist = document.getElementById('np-artist');
-    if (npTitle) npTitle.textContent = msg.data.title || 'Unknown';
+    if (npTitle) npTitle.textContent = msg.data.title || 'Desconhecido';
     if (npArtist) npArtist.textContent = msg.data.artist || '';
   }
 
@@ -399,11 +500,11 @@ function handleWSMessage(msg) {
 let currentPage = 'dashboard';
 
 const pages = {
-  dashboard: { title: 'Dashboard', render: renderDashboard },
+  dashboard: { title: 'Painel', render: renderDashboard },
   subscription: { title: 'Assinatura', render: renderSubscription },
   stations: { title: 'Estações', render: renderStations },
-  stream: { title: 'Stream Control', render: renderStreamControl },
-  media: { title: 'Media Library', render: renderMedia },
+  stream: { title: 'Controlo de Stream', render: renderStreamControl },
+  media: { title: 'Biblioteca Multimédia', render: renderMedia },
   schedule: { title: 'Agenda', render: renderSchedule },
   djs: { title: 'DJs & Locutores', render: renderDJs },
   admin: { title: 'Administração', render: renderAdmin, adminOnly: true }
@@ -499,7 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       navigateTo(dest);
       toast(isSignup ? 'Conta criada! Escolhe um plano.' : 'Sessão iniciada!', 'success');
     } catch (err) {
-      errorEl.textContent = err.message || 'Credenciais inválidas';
+      errorEl.textContent = translateMessage(err.message) || 'Credenciais inválidas';
     } finally {
       setButtonLoading(submitBtn, false);
       setFormLoading(loginForm, false);

@@ -164,7 +164,7 @@ async function loadStreamCredentials() {
             <div><strong>Servidor:</strong> ${escapeHtml(ic.host)}</div>
             <div><strong>Porta:</strong> ${ic.port}</div>
             <div><strong>Mount:</strong> <code>${escapeHtml(ic.mountpoint)}</code></div>
-            <div><strong>User:</strong> ${escapeHtml(ic.username)}</div>
+            <div><strong>Utilizador:</strong> ${escapeHtml(ic.username)}</div>
             <div><strong>Pass:</strong> <code>${escapeHtml(ic.password)}</code></div>
           </div>
         </div>
@@ -227,7 +227,7 @@ export function updateDashboardStats(data) {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
         <div>
           <div style="font-weight:600;">/${m.mount}</div>
-          <div style="font-size:0.78rem;color:var(--text-muted);">${m.title || 'No metadata'}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">${m.title || 'Sem metadados'}</div>
         </div>
         <div style="text-align:right;">
           <span class="badge badge-success">${m.listeners} ouvintes</span>

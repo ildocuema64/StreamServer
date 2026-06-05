@@ -8,30 +8,30 @@ export function renderStreamControl(container) {
   container.innerHTML = `
     <div class="panel">
       <div class="panel-header">
-        <span class="panel-title">⚡ Stream Control</span>
+        <span class="panel-title">⚡ Controlo de Stream</span>
         <button class="btn btn-primary btn-sm" id="btn-stream-refresh">Atualizar</button>
       </div>
       <div class="panel-body">
         <div class="control-grid" style="margin-bottom:16px;">
           <button class="control-btn" id="btn-autodj-start">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-            <span>AutoDJ Start</span>
+            <span>Iniciar AutoDJ</span>
           </button>
           <button class="control-btn" id="btn-autodj-stop">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
-            <span>AutoDJ Stop</span>
+            <span>Parar AutoDJ</span>
           </button>
           <button class="control-btn" id="btn-autodj-skip">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-            <span>Skip</span>
+            <span>Saltar</span>
           </button>
           <button class="control-btn" id="btn-rec-start">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-            <span>Rec Start</span>
+            <span>Iniciar gravação</span>
           </button>
           <button class="control-btn" id="btn-rec-stop">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10"/></svg>
-            <span>Rec Stop</span>
+            <span>Parar gravação</span>
           </button>
         </div>
 
@@ -71,7 +71,7 @@ function wireButtons() {
 
   bindAction('btn-autodj-start', '/stream/autodj/start', 'AutoDJ iniciado', 'A iniciar...');
   bindAction('btn-autodj-stop', '/stream/autodj/stop', 'AutoDJ parado', 'A parar...');
-  bindAction('btn-autodj-skip', '/stream/autodj/skip', 'Track skipped', 'A saltar...');
+  bindAction('btn-autodj-skip', '/stream/autodj/skip', 'Faixa saltada', 'A saltar...');
   bindAction('btn-rec-start', '/stream/recording/start', 'Gravação iniciada', 'A gravar...');
   bindAction('btn-rec-stop', '/stream/recording/stop', 'Gravação parada', 'A parar...');
 }

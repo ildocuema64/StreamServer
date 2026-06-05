@@ -74,18 +74,18 @@ function getPublicBaseUrl(urlContext = {}) {
     process.env.PUBLIC_STREAM_URL,
     process.env.APP_URL,
     urlContext.origin
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .map(stripTrailingSlash);
 
-  for (const raw of candidates) {
-    const base = stripTrailingSlash(raw);
-    if (process.env.NODE_ENV === 'production' && isLocalUrl(base)) continue;
-    return ensureHttps(base);
-  }
+  // 1ª preferência: o primeiro candidato PÚBLICO (não-local), seja qual for o NODE_ENV.
+  // Isto evita que um APP_URL=localhost mal configurado contamine os URLs públicos
+  // quando o pedido vem claramente de uma origem pública (ex.: o frontend na Vercel).
+  const publicBase = candidates.find((base) => !isLocalUrl(base));
+  if (publicBase) return ensureHttps(publicBase);
 
-  const appUrl = process.env.APP_URL;
-  if (appUrl && !(process.env.NODE_ENV === 'production' && isLocalUrl(appUrl))) {
-    return stripTrailingSlash(appUrl);
-  }
+  // 2ª preferência (dev / sem origem pública): primeiro candidato disponível, mesmo local.
+  if (candidates.length > 0) return candidates[0];
 
   const host = getStreamHostname();
   return `http://${host}`;

@@ -23,7 +23,7 @@ function getPaymentInstructions(plan = null) {
     'Abre a app Multicaixa Express no telemóvel.',
     `Selecciona "Transferir" ou "Pagamento".`,
     `Destinatário: ${name}`,
-    `Número Express: ${phoneFormatted}`,
+    `Número Express: ${phone}`,
     amountKz != null ? `Valor exacto: ${formatKwanza(amountKz)}` : 'Valor: conforme o plano escolhido.',
     'Confirma a transferência e guarda o comprovativo.',
     'Envia o comprovativo nesta plataforma (imagem ou PDF).',

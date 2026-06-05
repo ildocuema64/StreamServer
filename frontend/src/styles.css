@@ -964,14 +964,24 @@ input, select, textarea { font-family: inherit; }
 /* Multicaixa Express payment modal */
 .payment-card { max-width: 520px; width: 100%; }
 .payment-header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 16px;
-  gap: 12px;
+  padding: 8px 0;
 }
-.payment-logo { height: 48px; width: auto; object-fit: contain; }
+.payment-logo {
+  height: 88px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+}
 .payment-close {
+  position: absolute;
+  top: 0;
+  right: 0;
   background: none;
   border: none;
   color: var(--text-muted);

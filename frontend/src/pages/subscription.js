@@ -28,7 +28,7 @@ export function renderSubscription(container) {
     <div class="modal-overlay" id="payment-modal">
       <div class="login-card payment-card">
         <div class="payment-header">
-          <img src="/multicaixa-express.svg" alt="Multicaixa Express" class="payment-logo" width="200" height="60">
+          <img src="/multicaixa-express.png" alt="Multicaixa Express" class="payment-logo">
           <button type="button" class="payment-close" id="btn-close-payment" aria-label="Fechar">&times;</button>
         </div>
 
@@ -85,7 +85,9 @@ export function renderSubscription(container) {
   });
   document.getElementById('proof-form')?.addEventListener('submit', handleProofSubmit);
   document.getElementById('btn-copy-phone')?.addEventListener('click', () => {
-    copyText(document.getElementById('payment-phone')?.textContent, 'Número copiado!');
+    const phone = document.getElementById('payment-phone')?.dataset.copyValue
+      || document.getElementById('payment-phone')?.textContent;
+    copyText(phone, 'Número copiado!');
   });
   document.getElementById('btn-copy-amount')?.addEventListener('click', () => {
     copyText(document.getElementById('payment-amount')?.textContent, 'Valor copiado!');
@@ -242,7 +244,7 @@ async function reopenPendingPayment(status) {
 function openPaymentModal({ subscription, plan, payment }) {
   pendingPaymentContext = { subscription, plan, payment };
 
-  const phone = payment.expressPhoneFormatted || payment.expressPhone || '+244 921 923 232';
+  const phone = payment.expressPhone || '921923232';
   document.getElementById('payment-plan-info').innerHTML = `
     <strong>${escapeHtml(plan.name)}</strong>
     <span class="payment-plan-price">${escapeHtml(payment.amountFormatted || plan.priceFormatted)}</span>
@@ -260,7 +262,9 @@ function openPaymentModal({ subscription, plan, payment }) {
   ];
   stepsEl.innerHTML = steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('');
 
-  document.getElementById('payment-phone').textContent = phone;
+  const phoneEl = document.getElementById('payment-phone');
+  phoneEl.textContent = phone;
+  phoneEl.dataset.copyValue = phone;
   document.getElementById('payment-amount').textContent = payment.amountFormatted || plan.priceFormatted;
   document.getElementById('payment-note').textContent = payment.note || '';
 

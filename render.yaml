@@ -1,4 +1,9 @@
 # Blueprint Render — opcional: Dashboard → New → Blueprint → este repo
+#
+# ATENÇÃO: se o serviço já foi criado manualmente (ex.: streamserver-ivu7),
+# este ficheiro NÃO altera as variáveis em produção. Define-as também em
+# Render → Environment. NUNCA uses localhost em produção:
+#   APP_URL=http://localhost:5173  →  gera links "http://localhost:5173/stream/..."
 services:
   - type: web
     name: streamserver-api
@@ -8,20 +13,27 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
+      # OBRIGATÓRIO em produção (caso contrário os links de stream saem como localhost)
       - key: NODE_ENV
         value: production
       - key: REDIS_DISABLED
         value: "true"
-      # Icecast: false se tiveres servidor Icecast acessível (define ICECAST_HOST)
+      # URL HTTPS do frontend na Vercel — base dos URLs públicos de ouvir online.
+      - key: APP_URL
+        value: https://stream-server-rouge.vercel.app
+      # Alternativa/override explícito para o link de escuta. Aponta para a Vercel
+      # (depende das rewrites /stream) ou diretamente para o backend
+      # (https://streamserver-ivu7.onrender.com — servido pelo proxy /stream).
+      - key: PUBLIC_STREAM_URL
+        value: https://stream-server-rouge.vercel.app
+      # Icecast: false só quando tiveres um servidor Icecast PÚBLICO acessível.
       - key: ICECAST_DISABLED
         value: "false"
-      # Obrigatório — URL HTTPS do frontend na Vercel (URLs públicas de ouvir online)
-      # - key: APP_URL
-      #   sync: false
-      # - key: PUBLIC_STREAM_URL
-      #   sync: false
-      # Host público do Icecast para o BUTT transmitir (não uses localhost)
-      # - key: PUBLIC_ICECAST_HOST
-      #   sync: false
-      # - key: ICECAST_HOST
-      #   sync: false
+      # Host público do Icecast para o BUTT transmitir (NÃO uses localhost).
+      # Define o valor real no Dashboard do Render (sync:false = não vem do blueprint).
+      - key: PUBLIC_ICECAST_HOST
+        sync: false
+      - key: ICECAST_HOST
+        sync: false
+      - key: ICECAST_PORT
+        value: "8000"

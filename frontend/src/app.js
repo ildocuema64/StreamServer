@@ -45,12 +45,25 @@ async function loadSession() {
 
 function updateUserUI(user) {
   if (!user) return;
-  const avatar = document.querySelector('.user-avatar');
-  const name = document.querySelector('.user-name');
+  const initial = (user.username || 'A')[0].toUpperCase();
+  document.querySelectorAll('.user-avatar').forEach((el) => { el.textContent = initial; });
+  document.querySelectorAll('.user-name').forEach((el) => { el.textContent = user.username || 'Utilizador'; });
   const role = document.querySelector('.user-role');
-  if (avatar) avatar.textContent = (user.username || 'A')[0].toUpperCase();
-  if (name) name.textContent = user.username || 'Utilizador';
   if (role) role.textContent = user.role === 'admin' ? 'Administrador' : 'Utilizador';
+}
+
+function updatePlanUI() {
+  const planEl = document.getElementById('topbar-plan');
+  if (!planEl) return;
+  if (currentUser?.role === 'admin' || subscriptionState?.isAdmin) {
+    planEl.textContent = 'Administrador';
+  } else if (subscriptionState?.hasAccess) {
+    planEl.textContent = subscriptionState.planName || 'Plano activo';
+  } else if (subscriptionState?.pendingProof || subscriptionState?.awaitingPayment) {
+    planEl.textContent = 'Pagamento pendente';
+  } else {
+    planEl.textContent = 'Sem plano';
+  }
 }
 
 function updateNavVisibility() {
@@ -62,6 +75,7 @@ function updateNavVisibility() {
     subBadge.className = subscriptionState.hasAccess ? 'sub-badge active' : 'sub-badge inactive';
     subBadge.style.display = 'inline';
   }
+  updatePlanUI();
 }
 
 // =============================================================================
@@ -486,7 +500,25 @@ function setAuthMode(mode) {
 // =============================================================================
 let ws = null;
 
+const WS_STATES = {
+  connecting: { cls: 'ws-connecting', label: 'A ligar…' },
+  online: { cls: 'ws-online', label: 'Em direto' },
+  offline: { cls: 'ws-offline', label: 'Sem ligação' }
+};
+
+function setWsStatus(state) {
+  const el = document.getElementById('ws-status');
+  if (!el) return;
+  const cfg = WS_STATES[state] || WS_STATES.connecting;
+  el.classList.remove('ws-connecting', 'ws-online', 'ws-offline');
+  el.classList.add(cfg.cls);
+  const label = el.querySelector('.ws-label');
+  if (label) label.textContent = cfg.label;
+  el.title = `Tempo real: ${cfg.label}`;
+}
+
 function connectWebSocket() {
+  setWsStatus('connecting');
   let url;
   const wsEnv = import.meta.env.VITE_BACKEND_WS?.trim();
   if (wsEnv) {
@@ -502,6 +534,8 @@ function connectWebSocket() {
   }
   ws = new WebSocket(url);
 
+  ws.onopen = () => { setWsStatus('online'); };
+
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
@@ -509,8 +543,11 @@ function connectWebSocket() {
     } catch (e) { /* ignore */ }
   };
 
-  ws.onclose = () => { setTimeout(connectWebSocket, 5000); };
-  ws.onerror = () => { ws.close(); };
+  ws.onclose = () => {
+    setWsStatus('offline');
+    setTimeout(connectWebSocket, 5000);
+  };
+  ws.onerror = () => { setWsStatus('offline'); ws.close(); };
 }
 
 function handleWSMessage(msg) {
@@ -557,6 +594,11 @@ const pages = {
   djs: { title: 'DJs & Locutores', render: renderDJs },
   admin: { title: 'Administração', render: renderAdmin, adminOnly: true }
 };
+
+function closeMobileSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('active');
+}
 
 function navigateTo(page) {
   if (!pages[page]) return;
@@ -660,12 +702,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(item.dataset.page);
-      document.getElementById('sidebar').classList.remove('open');
+      closeMobileSidebar();
     });
   });
 
-  document.getElementById('menu-toggle').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('menu-toggle')?.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    const isOpen = sidebar.classList.toggle('open');
+    document.getElementById('sidebar-overlay')?.classList.toggle('active', isOpen);
+  });
+
+  document.getElementById('sidebar-overlay')?.addEventListener('click', closeMobileSidebar);
+
+  // Restaurar e ligar o colapso da sidebar (desktop)
+  if (localStorage.getItem('sidebarCollapsed') === '1') {
+    document.getElementById('app')?.classList.add('sidebar-collapsed');
+  }
+  document.getElementById('sidebar-collapse')?.addEventListener('click', () => {
+    const collapsed = document.getElementById('app')?.classList.toggle('sidebar-collapsed');
+    localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
   });
 
   document.getElementById('btn-logout').addEventListener('click', async (e) => {

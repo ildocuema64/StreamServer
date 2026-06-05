@@ -405,6 +405,100 @@ input, select, textarea { font-family: inherit; }
 .btn-full { width: 100%; justify-content: center; }
 .btn-icon { padding: 8px; }
 
+.btn:disabled,
+.btn.is-loading {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn.is-loading .btn-spinner {
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+   Loading — spinners, preloader, page placeholders
+   ============================================================================= */
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner-lg {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  opacity: 0.9;
+}
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-slow), visibility var(--transition-slow);
+}
+
+.app-loader.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.app-loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.app-loader-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 280px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.content-area.is-navigating {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
 /* =============================================================================
    Forms
    ============================================================================= */
@@ -706,6 +800,17 @@ input, select, textarea { font-family: inherit; }
 
 .control-btn svg { opacity: 0.7; }
 .control-btn:hover svg { opacity: 1; }
+
+.control-btn.is-loading {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+  transform: none;
+}
+
+.control-btn.is-loading svg {
+  opacity: 0.35;
+}
 
 /* Now Playing */
 .now-playing {

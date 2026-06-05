@@ -2,7 +2,7 @@
 // Subscription Plans Page
 // =============================================================================
 
-import { api, toast, getSubscription, setSubscription } from '../app.js';
+import { api, toast, getSubscription, setSubscription, withButtonLoading } from '../app.js';
 
 export function renderSubscription(container) {
   container.innerHTML = `
@@ -72,7 +72,9 @@ async function loadPlans() {
     `).join('');
 
     grid.querySelectorAll('.btn-subscribe').forEach((btn) => {
-      btn.addEventListener('click', () => subscribe(btn.dataset.planId));
+      btn.addEventListener('click', () => {
+        withButtonLoading(btn, () => subscribe(btn.dataset.planId), 'A subscrever...');
+      });
     });
   } catch (e) {
     grid.innerHTML = `<p style="color:var(--danger);">Erro: ${escapeHtml(e.message)}</p>`;

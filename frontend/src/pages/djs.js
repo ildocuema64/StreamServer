@@ -2,7 +2,7 @@
 // DJs Page
 // =============================================================================
 
-import { api, toast } from '../app.js';
+import { api, toast, withButtonLoading } from '../app.js';
 
 export function renderDJs(container) {
   container.innerHTML = `
@@ -30,7 +30,9 @@ export function renderDJs(container) {
     </div>
   `;
 
-  document.getElementById('btn-refresh-djs')?.addEventListener('click', loadDjs);
+  document.getElementById('btn-refresh-djs')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, loadDjs, 'A atualizar...');
+  });
   loadDjs();
 }
 

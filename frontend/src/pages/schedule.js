@@ -2,7 +2,7 @@
 // Schedule Page
 // =============================================================================
 
-import { api, toast } from '../app.js';
+import { api, toast, withButtonLoading } from '../app.js';
 
 export function renderSchedule(container) {
   container.innerHTML = `
@@ -35,7 +35,9 @@ export function renderSchedule(container) {
     </div>
   `;
 
-  document.getElementById('btn-refresh-schedule')?.addEventListener('click', loadSchedule);
+  document.getElementById('btn-refresh-schedule')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, loadSchedule, 'A atualizar...');
+  });
   loadSchedule();
 }
 

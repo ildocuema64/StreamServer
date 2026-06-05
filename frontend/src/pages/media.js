@@ -2,7 +2,7 @@
 // Media Library Page
 // =============================================================================
 
-import { api, toast } from '../app.js';
+import { api, toast, withButtonLoading } from '../app.js';
 
 export function renderMedia(container) {
   container.innerHTML = `
@@ -34,9 +34,15 @@ export function renderMedia(container) {
     </div>
   `;
 
-  const run = () => loadMedia({ search: document.getElementById('media-search')?.value });
-  document.getElementById('btn-media-refresh')?.addEventListener('click', () => loadMedia({}));
-  document.getElementById('btn-media-search')?.addEventListener('click', run);
+  const run = (btn) => withButtonLoading(
+    btn || document.getElementById('btn-media-search'),
+    () => loadMedia({ search: document.getElementById('media-search')?.value }),
+    'A pesquisar...'
+  );
+  document.getElementById('btn-media-refresh')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, () => loadMedia({}), 'A atualizar...');
+  });
+  document.getElementById('btn-media-search')?.addEventListener('click', (e) => run(e.currentTarget));
   document.getElementById('media-search')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') run();
   });

@@ -10,6 +10,15 @@ import { renderSchedule } from './pages/schedule.js';
 import { renderDJs } from './pages/djs.js';
 import { renderSubscription } from './pages/subscription.js';
 import { renderAdmin } from './pages/admin.js';
+import {
+  showAppLoader,
+  hideAppLoader,
+  pageLoaderHTML,
+  setButtonLoading,
+  setFormLoading
+} from './loading.js';
+
+export { setButtonLoading, withButtonLoading } from './loading.js';
 
 let currentUser = null;
 let subscriptionState = null;
@@ -343,40 +352,46 @@ function navigateTo(page) {
   if (pages[page].adminOnly && currentUser?.role !== 'admin') return;
   currentPage = page;
 
-  // Update nav
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === page);
   });
 
-  // Update title
   document.getElementById('page-title').textContent = pages[page].title;
 
-  // Render page
   const content = document.getElementById('content-area');
-  content.innerHTML = '';
+  content.classList.add('is-navigating');
+  content.innerHTML = pageLoaderHTML(`A carregar ${pages[page].title}...`);
   pages[page].render(content);
+  content.classList.remove('is-navigating');
 }
 
 // =============================================================================
 // Init
 // =============================================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  showAppLoader('A iniciar...');
   initConfirmModal();
+
   document.getElementById('toggle-register')?.addEventListener('click', () => setAuthMode('signup'));
   document.getElementById('toggle-login')?.addEventListener('click', () => setAuthMode('login'));
 
-  // Login form
-  document.getElementById('login-form').addEventListener('submit', async (e) => {
+  const loginForm = document.getElementById('login-form');
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const errorEl = document.getElementById('login-error');
+    const submitBtn = document.getElementById('login-submit');
     errorEl.textContent = '';
+
+    const isSignup = authMode === 'signup';
+    setButtonLoading(submitBtn, true, isSignup ? 'A criar conta...' : 'A entrar...');
+    setFormLoading(loginForm, true);
 
     try {
       const username = document.getElementById('login-username').value;
       const password = document.getElementById('login-password').value;
 
       let data;
-      if (authMode === 'signup') {
+      if (isSignup) {
         const displayName = document.getElementById('register-display-name')?.value;
         const email = document.getElementById('register-email')?.value;
         const pw2 = document.getElementById('register-password2')?.value;
@@ -415,46 +430,60 @@ document.addEventListener('DOMContentLoaded', () => {
       updateUserUI(data.user);
 
       hideLogin();
-      const dest = authMode === 'signup' || !subscriptionState?.hasAccess && currentUser?.role !== 'admin'
+      showAppLoader('A preparar o painel...');
+      const dest = isSignup || !subscriptionState?.hasAccess && currentUser?.role !== 'admin'
         ? 'subscription' : 'dashboard';
       navigateTo(dest);
-      toast(authMode === 'signup' ? 'Conta criada! Escolhe um plano.' : 'Sessão iniciada!', 'success');
+      toast(isSignup ? 'Conta criada! Escolhe um plano.' : 'Sessão iniciada!', 'success');
     } catch (err) {
       errorEl.textContent = err.message || 'Credenciais inválidas';
+    } finally {
+      setButtonLoading(submitBtn, false);
+      setFormLoading(loginForm, false);
+      hideAppLoader();
     }
   });
 
-  // Navigation
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(item.dataset.page);
-      // Close mobile sidebar
       document.getElementById('sidebar').classList.remove('open');
     });
   });
 
-  // Mobile menu
   document.getElementById('menu-toggle').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('open');
   });
 
-  // Logout
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    localStorage.removeItem('token');
-    currentUser = null;
-    subscriptionState = null;
-    showLogin();
-    toast('Sessão terminada', 'warning');
+  document.getElementById('btn-logout').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    setButtonLoading(btn, true, 'A sair...');
+    try {
+      localStorage.removeItem('token');
+      currentUser = null;
+      subscriptionState = null;
+      document.getElementById('content-area').innerHTML = '';
+      setAuthMode('login');
+      showLogin();
+      toast('Sessão terminada', 'warning');
+    } finally {
+      setButtonLoading(btn, false);
+    }
   });
 
-  if (!isAuthenticated()) {
-    setAuthMode('login');
-    showLogin();
-  } else {
-    loadSession().then(() => navigateTo('dashboard'));
+  try {
+    if (!isAuthenticated()) {
+      setAuthMode('login');
+      showLogin();
+    } else {
+      showAppLoader('A restaurar sessão...');
+      await loadSession();
+      navigateTo('dashboard');
+    }
+  } finally {
+    hideAppLoader();
   }
 
-  // Connect WebSocket
   connectWebSocket();
 });

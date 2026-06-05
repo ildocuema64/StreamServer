@@ -2,7 +2,7 @@
 // Stream Control Page
 // =============================================================================
 
-import { api, toast } from '../app.js';
+import { api, toast, withButtonLoading } from '../app.js';
 
 export function renderStreamControl(container) {
   container.innerHTML = `
@@ -59,30 +59,28 @@ export function renderStreamControl(container) {
 }
 
 function wireButtons() {
-  document.getElementById('btn-stream-refresh')?.addEventListener('click', loadStatus);
+  document.getElementById('btn-stream-refresh')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, loadStatus, 'A atualizar...');
+  });
 
-  document.getElementById('btn-autodj-start')?.addEventListener('click', async () => {
-    await action('/stream/autodj/start', 'AutoDJ iniciado');
-  });
-  document.getElementById('btn-autodj-stop')?.addEventListener('click', async () => {
-    await action('/stream/autodj/stop', 'AutoDJ parado');
-  });
-  document.getElementById('btn-autodj-skip')?.addEventListener('click', async () => {
-    await action('/stream/autodj/skip', 'Track skipped');
-  });
-  document.getElementById('btn-rec-start')?.addEventListener('click', async () => {
-    await action('/stream/recording/start', 'Gravação iniciada');
-  });
-  document.getElementById('btn-rec-stop')?.addEventListener('click', async () => {
-    await action('/stream/recording/stop', 'Gravação parada');
-  });
+  const bindAction = (id, path, okMsg, loadingText) => {
+    document.getElementById(id)?.addEventListener('click', (e) => {
+      withButtonLoading(e.currentTarget, () => action(path, okMsg), loadingText);
+    });
+  };
+
+  bindAction('btn-autodj-start', '/stream/autodj/start', 'AutoDJ iniciado', 'A iniciar...');
+  bindAction('btn-autodj-stop', '/stream/autodj/stop', 'AutoDJ parado', 'A parar...');
+  bindAction('btn-autodj-skip', '/stream/autodj/skip', 'Track skipped', 'A saltar...');
+  bindAction('btn-rec-start', '/stream/recording/start', 'Gravação iniciada', 'A gravar...');
+  bindAction('btn-rec-stop', '/stream/recording/stop', 'Gravação parada', 'A parar...');
 }
 
 async function action(path, okMsg) {
   try {
     await api(path, { method: 'POST', body: JSON.stringify({}) });
     toast(okMsg, 'success');
-    loadStatus();
+    await loadStatus();
   } catch (e) {
     toast(e.message || 'Falha', 'error');
   }

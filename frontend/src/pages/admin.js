@@ -2,7 +2,7 @@
 // Admin Panel — user & subscription management
 // =============================================================================
 
-import { api, toast, confirmDeleteStation } from '../app.js';
+import { api, toast, confirmDeleteStation, withButtonLoading } from '../app.js';
 
 let plans = [];
 
@@ -63,8 +63,12 @@ export function renderAdmin(container) {
     </div>
   `;
 
-  document.getElementById('btn-refresh-admin')?.addEventListener('click', loadAdmin);
-  document.getElementById('btn-refresh-stations-admin')?.addEventListener('click', loadAdminStations);
+  document.getElementById('btn-refresh-admin')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, loadAdmin, 'A atualizar...');
+  });
+  document.getElementById('btn-refresh-stations-admin')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, loadAdminStations, 'A atualizar...');
+  });
   loadAdmin();
 }
 
@@ -114,11 +118,21 @@ async function loadAdmin() {
       `;
     }).join('');
 
-    tbody.querySelectorAll('.btn-block').forEach((b) => b.addEventListener('click', () => blockUser(b.dataset.id)));
-    tbody.querySelectorAll('.btn-unblock').forEach((b) => b.addEventListener('click', () => unblockUser(b.dataset.id)));
-    tbody.querySelectorAll('.btn-grant').forEach((b) => b.addEventListener('click', () => grantPlan(b.dataset.id)));
-    tbody.querySelectorAll('.btn-revoke').forEach((b) => b.addEventListener('click', () => revokeSub(b.dataset.id)));
-    tbody.querySelectorAll('.btn-delete').forEach((b) => b.addEventListener('click', () => deleteUser(b.dataset.id)));
+    tbody.querySelectorAll('.btn-block').forEach((b) => {
+      b.addEventListener('click', () => withButtonLoading(b, () => blockUser(b.dataset.id), 'A bloquear...'));
+    });
+    tbody.querySelectorAll('.btn-unblock').forEach((b) => {
+      b.addEventListener('click', () => withButtonLoading(b, () => unblockUser(b.dataset.id), 'A desbloquear...'));
+    });
+    tbody.querySelectorAll('.btn-grant').forEach((b) => {
+      b.addEventListener('click', () => withButtonLoading(b, () => grantPlan(b.dataset.id), 'A conceder...'));
+    });
+    tbody.querySelectorAll('.btn-revoke').forEach((b) => {
+      b.addEventListener('click', () => withButtonLoading(b, () => revokeSub(b.dataset.id), 'A revogar...'));
+    });
+    tbody.querySelectorAll('.btn-delete').forEach((b) => {
+      b.addEventListener('click', () => withButtonLoading(b, () => deleteUser(b.dataset.id), 'A remover...'));
+    });
 
     await loadAdminStations();
   } catch (e) {
@@ -164,7 +178,7 @@ async function loadAdminStations() {
     tbody.querySelectorAll('.btn-delete-station').forEach((b) => {
       b.addEventListener('click', () => {
         const name = b.closest('tr')?.querySelector('td')?.textContent?.trim() || 'esta estação';
-        deleteStation(b.dataset.id, name);
+        withButtonLoading(b, () => deleteStation(b.dataset.id, name), 'A remover...');
       });
     });
   } catch (e) {

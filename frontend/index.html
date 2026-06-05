@@ -10,6 +10,14 @@
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
+  <!-- Global preloader (visible until app init completes) -->
+  <div id="app-loader" class="app-loader active" aria-busy="true" aria-label="A iniciar">
+    <div class="app-loader-content">
+      <div class="spinner spinner-lg"></div>
+      <p class="app-loader-text">A iniciar...</p>
+    </div>
+  </div>
+
   <div id="app">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">

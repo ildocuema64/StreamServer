@@ -2,7 +2,7 @@
 // Stations Page - Create stations, stream URLs & BUTT credentials
 // =============================================================================
 
-import { api, toast, getSubscription, confirmDeleteStation } from '../app.js';
+import { api, toast, getSubscription, confirmDeleteStation, withButtonLoading } from '../app.js';
 
 export function renderStations(container) {
   container.innerHTML = `
@@ -125,7 +125,9 @@ export function renderStations(container) {
     </div>
   `;
 
-  document.getElementById('btn-refresh-stations')?.addEventListener('click', loadStations);
+  document.getElementById('btn-refresh-stations')?.addEventListener('click', (e) => {
+    withButtonLoading(e.currentTarget, loadStations, 'A atualizar...');
+  });
   document.getElementById('btn-new-station')?.addEventListener('click', openCreateModal);
   document.getElementById('btn-cancel-station')?.addEventListener('click', closeCreateModal);
   document.getElementById('station-form')?.addEventListener('submit', handleCreateStation);
@@ -191,10 +193,14 @@ async function loadStations() {
     }).join('');
 
     tbody.querySelectorAll('.btn-show-creds').forEach((btn) => {
-      btn.addEventListener('click', () => showCredentials(btn.dataset.id));
+      btn.addEventListener('click', () => {
+        withButtonLoading(btn, () => showCredentials(btn.dataset.id), 'A carregar...');
+      });
     });
     tbody.querySelectorAll('.btn-delete-station').forEach((btn) => {
-      btn.addEventListener('click', () => deleteStation(btn.dataset.id, btn.closest('tr')?.querySelector('td')?.textContent?.trim()));
+      btn.addEventListener('click', () => {
+        withButtonLoading(btn, () => deleteStation(btn.dataset.id, btn.closest('tr')?.querySelector('td')?.textContent?.trim()), 'A remover...');
+      });
     });
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger);padding:16px;">Falha: ${escapeHtml(e.message || 'erro')}</td></tr>`;
@@ -219,6 +225,7 @@ function closeCredsModal() {
 async function handleCreateStation(e) {
   e.preventDefault();
   const errEl = document.getElementById('station-form-error');
+  const submitBtn = e.submitter || e.target.querySelector('[type="submit"]');
   errEl.textContent = '';
 
   const name = document.getElementById('st-name').value.trim();
@@ -228,18 +235,20 @@ async function handleCreateStation(e) {
   const format = document.getElementById('st-format').value;
   const bitrate = parseInt(document.getElementById('st-bitrate').value, 10);
 
-  try {
-    const body = { name, genre, description, format, bitrate };
-    if (slug) body.slug = slug;
+  await withButtonLoading(submitBtn, async () => {
+    try {
+      const body = { name, genre, description, format, bitrate };
+      if (slug) body.slug = slug;
 
-    const station = await api('/stations', { method: 'POST', body: JSON.stringify(body) });
-    closeCreateModal();
-    toast(`Estação "${station.name}" criada!`, 'success');
-    await loadStations();
-    showCredentialsFromData(station);
-  } catch (err) {
-    errEl.textContent = err.message || 'Erro ao criar estação';
-  }
+      const station = await api('/stations', { method: 'POST', body: JSON.stringify(body) });
+      closeCreateModal();
+      toast(`Estação "${station.name}" criada!`, 'success');
+      await loadStations();
+      showCredentialsFromData(station);
+    } catch (err) {
+      errEl.textContent = err.message || 'Erro ao criar estação';
+    }
+  }, 'A criar...');
 }
 
 async function showCredentials(stationId) {

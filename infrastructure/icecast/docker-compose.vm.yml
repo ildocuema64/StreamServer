@@ -1,0 +1,67 @@
+# =============================================================================
+# StreamServer — Icecast público (apenas para a VM/VPS)
+# =============================================================================
+# Usar SÓ na máquina que vai alojar o Icecast (não no Render nem na Vercel).
+#
+# Pré-requisitos:
+#   1) Editar icecast.prod.xml (hostname público + passwords CHANGE_ME_*).
+#   2) Abrir a porta TCP 8000 na firewall da VM.
+#
+# Arrancar:
+#   docker compose -f docker-compose.vm.yml up -d
+# Ver logs:
+#   docker compose -f docker-compose.vm.yml logs -f icecast
+# Testar (do teu PC):
+#   curl http://SEU_HOST_PUBLICO:8000/status-json.xsl
+#
+# Depois, no Render (Environment) define:
+#   ICECAST_DISABLED=false
+#   ICECAST_HOST=SEU_HOST_PUBLICO
+#   PUBLIC_ICECAST_HOST=SEU_HOST_PUBLICO
+#   ICECAST_PORT=8000
+#   ICECAST_ADMIN_USER=admin
+#   ICECAST_ADMIN_PASSWORD=<igual ao admin-password do icecast.prod.xml>
+#   (NÃO definir INTERNAL_API_KEY — senão a auth de fontes é rejeitada)
+# =============================================================================
+services:
+  icecast:
+    image: infiniteproject/icecast:latest
+    container_name: streamserver-icecast
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./icecast.prod.xml:/etc/icecast2/icecast.xml:ro
+      - icecast_logs:/var/log/icecast2
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/status-json.xsl"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # AutoDJ (opcional) — fallback automático quando nenhum DJ está no ar.
+  # Descomenta se quiseres AutoDJ. Requer ICECAST_SOURCE_PASSWORD = source-password
+  # definido no icecast.prod.xml. Liga ao Icecast pela rede interna do compose.
+  # ---------------------------------------------------------------------------
+  # liquidsoap:
+  #   build:
+  #     context: ../liquidsoap
+  #     dockerfile: Dockerfile
+  #   container_name: streamserver-liquidsoap
+  #   restart: unless-stopped
+  #   environment:
+  #     ICECAST_HOST: icecast
+  #     ICECAST_PORT: "8000"
+  #     ICECAST_SOURCE_PASSWORD: CHANGE_ME_SOURCE
+  #     LIQUIDSOAP_TELNET_PORT: "1234"
+  #   volumes:
+  #     - ../liquidsoap/radio.liq:/etc/liquidsoap/radio.liq
+  #     - ../liquidsoap/scripts:/etc/liquidsoap/scripts
+  #   depends_on:
+  #     icecast:
+  #       condition: service_healthy
+
+volumes:
+  icecast_logs:
+    driver: local

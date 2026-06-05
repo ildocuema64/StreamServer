@@ -1,0 +1,108 @@
+<!--
+  =============================================================================
+  Icecast Configuration — PRODUÇÃO (VPS público)
+  =============================================================================
+  Diferenças face a icecast.local.xml / icecast.xml:
+    1. <hostname> = host PÚBLICO desta máquina (subdomínio ou IP).
+    2. stream_auth aponta para o BACKEND PÚBLICO (Render), não para backend:3000.
+    3. Passwords fortes (troca todos os CHANGE_ME_*).
+
+  EDITAR ANTES DE USAR (procura por CHANGE_ME):
+    - <hostname>
+    - <source-password>, <relay-password>, <admin-password>
+  O URL do backend já está preenchido para streamserver-ivu7.onrender.com.
+
+  Notas:
+    - O BUTT liga DIRETAMENTE a este servidor na porta 8000 (HTTP, sem TLS).
+    - Os ouvintes chegam via proxy /stream do backend (HTTPS na Vercel/Render).
+    - No Render NÃO definas INTERNAL_API_KEY (senão o callback de auth é rejeitado).
+-->
+<icecast>
+    <limits>
+        <clients>1000</clients>
+        <sources>10</sources>
+        <queue-size>524288</queue-size>
+        <client-timeout>30</client-timeout>
+        <header-timeout>15</header-timeout>
+        <source-timeout>10</source-timeout>
+        <burst-on-connect>1</burst-on-connect>
+        <burst-size>65535</burst-size>
+    </limits>
+
+    <authentication>
+        <source-password>CHANGE_ME_SOURCE</source-password>
+        <relay-password>CHANGE_ME_RELAY</relay-password>
+        <admin-user>admin</admin-user>
+        <admin-password>CHANGE_ME_ADMIN</admin-password>
+    </authentication>
+
+    <!-- Host PÚBLICO desta máquina (o que aparece no BUTT como "Servidor") -->
+    <hostname>CHANGE_ME_PUBLIC_HOST</hostname>
+    <location>StreamServer Radio</location>
+    <admin>admin@radio.example.com</admin>
+
+    <fileserve>1</fileserve>
+    <paths>
+        <basedir>/usr/share/icecast2</basedir>
+        <logdir>/var/log/icecast2</logdir>
+        <webroot>/usr/share/icecast2/web</webroot>
+        <adminroot>/usr/share/icecast2/admin</adminroot>
+        <alias source="/" destination="/status.xsl"/>
+    </paths>
+
+    <http-headers>
+        <header name="Access-Control-Allow-Origin" value="*" />
+        <header name="Access-Control-Allow-Headers" value="Origin, Accept, X-Requested-With, Content-Type, Icy-MetaData" />
+        <header name="Access-Control-Allow-Methods" value="GET, OPTIONS, HEAD" />
+    </http-headers>
+
+    <listen-socket>
+        <port>8000</port>
+        <bind-address>0.0.0.0</bind-address>
+    </listen-socket>
+
+    <!-- ===================================================================
+         Mounts dinâmicos por estação (/{slug}/live) — autenticação por URL
+         que valida a source_password de cada estação no backend público.
+         =================================================================== -->
+    <mount type="default">
+        <public>1</public>
+        <max-listeners>500</max-listeners>
+        <authentication type="url">
+            <option name="stream_auth" value="https://streamserver-ivu7.onrender.com/api/internal/icecast/auth"/>
+            <option name="auth_header" value="icecast-auth-user: 1"/>
+        </authentication>
+    </mount>
+
+    <!-- Mount /live (compatível com BUTT) — também via auth de URL -->
+    <mount type="normal">
+        <mount-name>/live</mount-name>
+        <max-listeners>500</max-listeners>
+        <hidden>0</hidden>
+        <public>1</public>
+        <stream-name>StreamServer Live</stream-name>
+        <stream-description>Professional Live Broadcasting</stream-description>
+        <genre>Various</genre>
+        <bitrate>128</bitrate>
+        <type>audio/mpeg</type>
+        <subtype>mp3</subtype>
+        <charset>UTF-8</charset>
+        <authentication type="url">
+            <option name="stream_auth" value="https://streamserver-ivu7.onrender.com/api/internal/icecast/auth"/>
+            <option name="auth_header" value="icecast-auth-user: 1"/>
+        </authentication>
+    </mount>
+
+    <logging>
+        <accesslog>access.log</accesslog>
+        <errorlog>error.log</errorlog>
+        <playlistlog>playlist.log</playlistlog>
+        <loglevel>3</loglevel>
+        <logsize>10000</logsize>
+        <logarchive>1</logarchive>
+    </logging>
+
+    <security>
+        <chroot>0</chroot>
+    </security>
+</icecast>

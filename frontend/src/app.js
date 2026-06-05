@@ -84,29 +84,92 @@ function resolveBackendOrigin() {
 const BACKEND_ORIGIN = resolveBackendOrigin();
 const API_BASE = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api` : '/api';
 
+const PUBLIC_AUTH_PATHS = new Set(['/auth/login', '/auth/signup', '/auth/refresh']);
+
+function parseResponseBody(raw) {
+  if (!raw?.trim()) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearAuth() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  currentUser = null;
+  subscriptionState = null;
+}
+
+let refreshInFlight = null;
+
+async function refreshSession() {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) throw new Error('No refresh token');
+
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken })
+    })
+      .then(async (res) => {
+        const raw = await res.text();
+        const data = parseResponseBody(raw);
+        if (!res.ok) {
+          throw new Error(data?.error || 'Refresh token inválido');
+        }
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+        return data;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+
+  return refreshInFlight;
+}
+
 export async function api(path, options = {}) {
-  const token = localStorage.getItem('token');
+  const isPublicAuth = PUBLIC_AUTH_PATHS.has(path);
+  const token = isPublicAuth ? null : localStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
-  if (res.status === 401) {
-    localStorage.removeItem('token');
-    showLogin();
-    throw new Error('Session expired');
-  }
-
   // Some proxies / middlewares can return empty bodies (or non-JSON) on errors.
-  // Parse defensively so the UI shows a useful message instead of crashing.
   const raw = await res.text();
-  let data = null;
-  if (raw && raw.trim()) {
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      data = null;
+  const data = parseResponseBody(raw);
+
+  if (res.status === 401) {
+    if (isPublicAuth) {
+      const msg =
+        data?.error ||
+        (path === '/auth/login' ? 'Credenciais inválidas' : 'Pedido não autorizado');
+      const err = new Error(msg);
+      err.status = 401;
+      throw err;
     }
+
+    if (!options._retried && localStorage.getItem('refreshToken')) {
+      try {
+        await refreshSession();
+        return api(path, { ...options, _retried: true });
+      } catch {
+        /* refresh failed — fall through to logout */
+      }
+    }
+
+    clearAuth();
+    showLogin();
+    setAuthMode('login');
+    const err = new Error('Sessão expirada. Inicia sessão novamente.');
+    err.status = 401;
+    err.code = 'SESSION_EXPIRED';
+    throw err;
   }
 
   if (!res.ok) {
@@ -123,7 +186,6 @@ export async function api(path, options = {}) {
     throw err;
   }
 
-  // Successful response with no body (e.g. 204)
   return data ?? {};
 }
 
@@ -233,7 +295,7 @@ function hideLogin() {
 }
 
 function isAuthenticated() {
-  return !!localStorage.getItem('token');
+  return !!localStorage.getItem('token') || !!localStorage.getItem('refreshToken');
 }
 
 let authMode = 'login'; // 'login' | 'signup'
@@ -424,6 +486,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       localStorage.setItem('token', data.token);
+      if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
       currentUser = data.user;
       if (data.subscription) setSubscription(data.subscription);
       else await loadSession();
@@ -460,9 +523,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = e.currentTarget;
     setButtonLoading(btn, true, 'A sair...');
     try {
-      localStorage.removeItem('token');
-      currentUser = null;
-      subscriptionState = null;
+      const refreshToken = localStorage.getItem('refreshToken');
+      try {
+        await api('/auth/logout', {
+          method: 'POST',
+          body: JSON.stringify({ refreshToken })
+        });
+      } catch { /* token may already be invalid */ }
+      clearAuth();
       document.getElementById('content-area').innerHTML = '';
       setAuthMode('login');
       showLogin();
@@ -478,8 +546,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       showLogin();
     } else {
       showAppLoader('A restaurar sessão...');
-      await loadSession();
-      navigateTo('dashboard');
+      if (!localStorage.getItem('token') && localStorage.getItem('refreshToken')) {
+        try {
+          await refreshSession();
+        } catch {
+          clearAuth();
+        }
+      }
+      if (localStorage.getItem('token')) {
+        const session = await loadSession();
+        if (session) {
+          navigateTo('dashboard');
+        } else {
+          clearAuth();
+          setAuthMode('login');
+          showLogin();
+        }
+      } else {
+        setAuthMode('login');
+        showLogin();
+      }
     }
   } finally {
     hideAppLoader();

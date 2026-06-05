@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 72" role="img" aria-label="Multicaixa Express">
+  <defs>
+    <linearGradient id="mcx-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9A3C"/>
+      <stop offset="100%" stop-color="#E85D04"/>
+    </linearGradient>
+  </defs>
+  <rect width="72" height="72" rx="16" fill="url(#mcx-grad)"/>
+  <path d="M18 48V24h8l10 16 10-16h8v24h-7V35l-9 13h-4l-9-13v13z" fill="#fff"/>
+  <text x="84" y="30" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" fill="#FF7E12">MULTICAIXA</text>
+  <text x="84" y="54" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="800" fill="#1a1a2e">Express</text>
+</svg>

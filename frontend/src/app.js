@@ -290,6 +290,50 @@ export async function api(path, options = {}) {
   return data ?? {};
 }
 
+export async function apiUpload(path, formData, options = {}) {
+  const token = localStorage.getItem('token');
+  const headers = { ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+    ...options
+  });
+
+  const raw = await res.text();
+  const data = parseResponseBody(raw);
+
+  if (res.status === 401) {
+    if (!options._retried && localStorage.getItem('refreshToken')) {
+      try {
+        await refreshSession();
+        return apiUpload(path, formData, { ...options, _retried: true });
+      } catch { /* fall through */ }
+    }
+    clearAuth();
+    showLogin();
+    setAuthMode('login');
+    const err = new Error('Sessão expirada. Inicia sessão novamente.');
+    err.status = 401;
+    throw err;
+  }
+
+  if (!res.ok) {
+    const rawMsg =
+      (data && (data.error || data.message || data.details)) ||
+      (raw && raw.trim()) ||
+      `Request failed (${res.status})`;
+    const err = new Error(translateMessage(rawMsg));
+    err.status = res.status;
+    err.response = data;
+    throw err;
+  }
+
+  return data ?? {};
+}
+
 // =============================================================================
 // Toast Notifications
 // =============================================================================

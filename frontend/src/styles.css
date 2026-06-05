@@ -958,6 +958,68 @@ input, select, textarea { font-family: inherit; }
 .sub-banner-active { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); }
 .sub-banner-inactive { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); }
 .sub-banner-admin { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); }
+.sub-banner-awaiting { background: rgba(255,126,18,0.12); border: 1px solid rgba(255,126,18,0.35); }
+.sub-banner-pending { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3); }
+
+/* Multicaixa Express payment modal */
+.payment-card { max-width: 520px; width: 100%; }
+.payment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.payment-logo { height: 48px; width: auto; object-fit: contain; }
+.payment-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.payment-close:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.payment-plan-info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.payment-plan-price { font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+.payment-country {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.payment-steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.payment-steps li { margin-bottom: 4px; }
+.payment-detail { margin-bottom: 12px; }
+.payment-phone, .payment-amount { font-size: 1.1rem; font-weight: 700; color: #FF7E12; }
+.payment-note {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+  font-style: italic;
+}
+.payment-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.payment-actions .btn-primary { flex: 1; }
 
 .sub-badge {
   margin-left: auto;

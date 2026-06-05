@@ -4,7 +4,17 @@
 
 import { api, apiUpload, toast, getSubscription, setSubscription, withButtonLoading } from '../app.js';
 
+const MULTICAIXA_EXPRESS_PHONE = normalizeExpressPhone(
+  import.meta.env.VITE_PAYMENT_EXPRESS_PHONE || '921923232'
+);
+
 let pendingPaymentContext = null;
+
+function normalizeExpressPhone(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  const local = digits.startsWith('244') ? digits.slice(3) : digits;
+  return local.length === 9 ? local : '921923232';
+}
 
 export function renderSubscription(container) {
   container.innerHTML = `
@@ -188,7 +198,11 @@ async function subscribe(planId) {
     });
 
     if (result.code === 'AWAITING_PAYMENT_PROOF') {
-      openPaymentModal(result);
+      openPaymentModal({
+        subscription: result.subscription,
+        plan: result.plan,
+        payment: result.payment
+      });
       const status = await api('/subscriptions/me');
       setSubscription(status);
       loadPlans();
@@ -241,31 +255,36 @@ async function reopenPendingPayment(status) {
   }
 }
 
-function openPaymentModal({ subscription, plan, payment }) {
+function openPaymentModal({ subscription, plan, payment = {} }) {
   pendingPaymentContext = { subscription, plan, payment };
 
-  const phone = payment.expressPhone || '921923232';
+  const phone = MULTICAIXA_EXPRESS_PHONE;
+  const amount = payment.amountFormatted || plan?.priceFormatted || '';
+  const recipient = payment.recipientName || 'StreamServer';
+
   document.getElementById('payment-plan-info').innerHTML = `
-    <strong>${escapeHtml(plan.name)}</strong>
-    <span class="payment-plan-price">${escapeHtml(payment.amountFormatted || plan.priceFormatted)}</span>
+    <strong>${escapeHtml(plan?.name || 'Plano')}</strong>
+    <span class="payment-plan-price">${escapeHtml(amount)}</span>
   `;
 
   const stepsEl = document.getElementById('payment-steps');
-  const steps = payment.steps || [
+  const steps = [
     'Abre a app Multicaixa Express no telemóvel.',
     'Selecciona "Transferir" ou "Pagamento".',
-    `Destinatário: ${payment.recipientName || 'StreamServer'}`,
+    `Destinatário: ${recipient}`,
     `Número Express: ${phone}`,
-    `Valor exacto: ${payment.amountFormatted || plan.priceFormatted}`,
+    amount ? `Valor exacto: ${amount}` : 'Valor: conforme o plano escolhido.',
     'Confirma a transferência e guarda o comprovativo.',
     'Envia o comprovativo nesta plataforma.'
   ];
   stepsEl.innerHTML = steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('');
 
   const phoneEl = document.getElementById('payment-phone');
-  phoneEl.textContent = phone;
-  phoneEl.dataset.copyValue = phone;
-  document.getElementById('payment-amount').textContent = payment.amountFormatted || plan.priceFormatted;
+  if (phoneEl) {
+    phoneEl.textContent = phone;
+    phoneEl.dataset.copyValue = phone;
+  }
+  document.getElementById('payment-amount').textContent = amount;
   document.getElementById('payment-note').textContent = payment.note || '';
 
   const proofForm = document.getElementById('proof-form');

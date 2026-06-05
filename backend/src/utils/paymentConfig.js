@@ -2,17 +2,19 @@
 // Payment instructions — Multicaixa Express (Angola)
 // =============================================================================
 
-function formatExpressPhone(phone) {
-  const digits = String(phone).replace(/\D/g, '');
+function normalizeExpressPhone(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
   const local = digits.startsWith('244') ? digits.slice(3) : digits;
-  if (local.length === 9) {
-    return `+244 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
-  }
-  return digits.startsWith('244') ? `+${digits}` : `+244 ${local}`;
+  return local.length === 9 ? local : '921923232';
+}
+
+function formatExpressPhone(phone) {
+  const local = normalizeExpressPhone(phone);
+  return `+244 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
 }
 
 function getPaymentInstructions(plan = null) {
-  const phone = process.env.PAYMENT_EXPRESS_PHONE || '921923232';
+  const phone = normalizeExpressPhone(process.env.PAYMENT_EXPRESS_PHONE || '921923232');
   const phoneFormatted = formatExpressPhone(phone);
   const name = process.env.PAYMENT_EXPRESS_NAME || 'StreamServer';
   const iban = process.env.PAYMENT_IBAN || '';
@@ -67,4 +69,10 @@ function formatPlanPrice(plan) {
   }).format(plan.price_cents / 100);
 }
 
-module.exports = { getPaymentInstructions, formatKwanza, formatPlanPrice, formatExpressPhone };
+module.exports = {
+  getPaymentInstructions,
+  formatKwanza,
+  formatPlanPrice,
+  formatExpressPhone,
+  normalizeExpressPhone
+};

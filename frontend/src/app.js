@@ -431,6 +431,10 @@ function setAuthMode(mode) {
   if (panel) panel.style.display = 'none';
   const pre = document.getElementById('signup-connection');
   if (pre) pre.textContent = '—';
+
+  const form = document.getElementById('login-form');
+  setFormLoading(form, false);
+  if (submit) setButtonLoading(submit, false);
 }
 
 // =============================================================================
@@ -546,8 +550,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorEl.textContent = '';
 
     const isSignup = authMode === 'signup';
-    setButtonLoading(submitBtn, true, isSignup ? 'A criar conta...' : 'A entrar...');
     setFormLoading(loginForm, true);
+    setButtonLoading(submitBtn, true, isSignup ? 'A criar conta...' : 'A entrar...');
 
     try {
       const username = document.getElementById('login-username').value;
@@ -602,8 +606,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       errorEl.textContent = translateMessage(err.message) || 'Credenciais inválidas';
     } finally {
-      setButtonLoading(submitBtn, false);
       setFormLoading(loginForm, false);
+      setButtonLoading(submitBtn, false);
       hideAppLoader();
     }
   });

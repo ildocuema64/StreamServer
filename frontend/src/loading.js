@@ -79,7 +79,9 @@ export function setFormLoading(form, loading) {
   if (!form) return;
   form.querySelectorAll('input, select, textarea, button').forEach((el) => {
     if (loading) {
-      el.dataset.wasDisabled = el.disabled ? '1' : '0';
+      if (el.dataset.wasDisabled === undefined) {
+        el.dataset.wasDisabled = el.disabled ? '1' : '0';
+      }
       el.disabled = true;
     } else if (el.dataset.wasDisabled !== undefined) {
       el.disabled = el.dataset.wasDisabled === '1';

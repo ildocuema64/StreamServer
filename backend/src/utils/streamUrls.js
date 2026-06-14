@@ -32,17 +32,29 @@ function ensureHttps(url) {
 
 function getRequestPublicOrigin(req) {
   if (!req) return null;
+
+  // Browser (cross-origin ou same-origin)
   const raw = req.get('origin') || req.get('referer');
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    if (process.env.NODE_ENV === 'production' && isLocalHostName(u.hostname)) {
-      return null;
-    }
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return null;
+  if (raw) {
+    try {
+      const u = new URL(raw);
+      if (!isLocalHostName(u.hostname)) {
+        return `${u.protocol}//${u.host}`;
+      }
+    } catch { /* ignore */ }
   }
+
+  // Proxy Vercel / CDN → backend (Origin por vezes omitido em server-side)
+  const forwardedHost = req.get('x-forwarded-host');
+  if (forwardedHost) {
+    const host = String(forwardedHost).split(',')[0].trim();
+    if (host && !isLocalHostName(host)) {
+      const proto = (req.get('x-forwarded-proto') || 'https').split(',')[0].trim();
+      return `${proto}://${host}`;
+    }
+  }
+
+  return null;
 }
 
 function normalizeMount(mountpoint) {
@@ -115,27 +127,34 @@ function getIcecastConnectHostname() {
 function getPublicBaseUrl(urlContext = {}) {
   const candidates = [
     process.env.PUBLIC_STREAM_URL,
+    process.env.FRONTEND_URL,
     process.env.APP_URL,
     urlContext.origin
   ]
     .filter(Boolean)
     .map(stripTrailingSlash);
 
-  // 1ª preferência: o primeiro candidato PÚBLICO (não-local), seja qual for o NODE_ENV.
-  // Isto evita que um APP_URL=localhost mal configurado contamine os URLs públicos
-  // quando o pedido vem claramente de uma origem pública (ex.: o frontend na Vercel).
   const publicBase = candidates.find((base) => !isLocalUrl(base));
   if (publicBase) return ensureHttps(publicBase);
 
-  // 2ª preferência (dev / sem origem pública): primeiro candidato disponível, mesmo local.
+  // Em Render/produção: nunca devolver localhost — APP_URL mal configurado
+  const onRender = Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
+  if (onRender || process.env.NODE_ENV === 'production') {
+    console.error(
+      '[stream] APP_URL ou PUBLIC_STREAM_URL em falta no Render. ' +
+        'Define APP_URL=https://stream-server-rouge.vercel.app (ou o teu domínio Vercel).'
+    );
+    return null;
+  }
+
   if (candidates.length > 0) return candidates[0];
 
-  const host = getStreamHostname();
-  return `http://${host}`;
+  return 'http://localhost:5173';
 }
 
 function buildListenUrl(mountpoint, urlContext) {
   const base = getPublicBaseUrl(urlContext);
+  if (!base) return null;
   const mount = normalizeMount(mountpoint);
   return `${base}/stream${mount}`;
 }
@@ -152,6 +171,7 @@ function buildDirectListenUrl(mountpoint) {
 
 function buildPlayerUrl(mountpoint, urlContext) {
   const base = getPublicBaseUrl(urlContext);
+  if (!base) return null;
   const mount = encodeURIComponent(normalizeMount(mountpoint));
   return `${base}/player?mount=${mount}`;
 }

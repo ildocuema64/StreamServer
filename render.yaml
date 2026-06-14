@@ -21,9 +21,9 @@ services:
       # URL HTTPS do frontend na Vercel — base dos URLs públicos de ouvir online.
       - key: APP_URL
         value: https://stream-server-rouge.vercel.app
-      # Alternativa/override explícito para o link de escuta. Aponta para a Vercel
-      # (depende das rewrites /stream) ou diretamente para o backend
-      # (https://streamserver-ivu7.onrender.com — servido pelo proxy /stream).
+      - key: FRONTEND_URL
+        value: https://stream-server-rouge.vercel.app
+      # Alternativa/override explícito para o link de escuta.
       - key: PUBLIC_STREAM_URL
         value: https://stream-server-rouge.vercel.app
       # Icecast: false só quando tiveres um servidor Icecast PÚBLICO acessível.

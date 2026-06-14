@@ -7,7 +7,7 @@ const router = express.Router();
 const { query } = require('../database/connection');
 const { cacheGet, cacheSet } = require('../services/redis');
 const { getActiveMounts } = require('../services/icecast');
-const { enrichStationPublic } = require('../utils/streamUrls');
+const { enrichStationPublic, getRequestPublicOrigin } = require('../utils/streamUrls');
 const logger = require('../utils/logger');
 
 // GET /api/public/stations - List active stations (public)
@@ -24,7 +24,8 @@ router.get('/stations', async (req, res) => {
        ORDER BY name`
     );
 
-    const stations = result.rows.map((row) => enrichStationPublic(row));
+    const urlContext = { origin: getRequestPublicOrigin(req) };
+    const stations = result.rows.map((row) => enrichStationPublic(row, urlContext));
     await cacheSet('public:stations', stations, 60);
     res.json(stations);
   } catch (error) {

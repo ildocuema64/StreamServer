@@ -8,15 +8,15 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://YOUR_API_DOMAIN/api/$1"
+      "destination": "https://streamserver-ivu7.onrender.com/api/$1"
     },
     {
       "source": "/ws",
-      "destination": "https://YOUR_API_DOMAIN/ws"
+      "destination": "https://streamserver-ivu7.onrender.com/ws"
     },
     {
       "source": "/stream/(.*)",
-      "destination": "https://YOUR_API_DOMAIN/stream/$1"
+      "destination": "https://streamserver-ivu7.onrender.com/stream/$1"
     },
     {
       "source": "/((?!assets/).*)",

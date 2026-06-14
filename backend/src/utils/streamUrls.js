@@ -50,23 +50,66 @@ function normalizeMount(mountpoint) {
   return mountpoint.startsWith('/') ? mountpoint : `/${mountpoint}`;
 }
 
+function hostnameFromPublicUrl(url) {
+  if (!url) return null;
+  try {
+    const normalized = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    const hostname = new URL(normalized).hostname;
+    return isLocalHostName(hostname) ? null : hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** True when APP_URL / PUBLIC_STREAM_URL / NODE_ENV indicam deploy público (não dev local). */
+function isPublicDeployment() {
+  if (process.env.NODE_ENV === 'production') return true;
+  return [process.env.PUBLIC_STREAM_URL, process.env.APP_URL, process.env.RENDER_EXTERNAL_URL]
+    .filter(Boolean)
+    .some((u) => !isLocalUrl(u));
+}
+
+/**
+ * Host Icecast para o BUTT — nunca localhost em deploy público.
+ * Ordem: PUBLIC_ICECAST_HOST → ICECAST_HOST → ICECAST_HOSTNAME → PUBLIC_STREAM_HOST
+ *        → hostname de PUBLIC_STREAM_URL / APP_URL / RENDER_EXTERNAL_URL
+ */
+function resolvePublicIcecastHost() {
+  const hostCandidates = [
+    process.env.PUBLIC_ICECAST_HOST,
+    process.env.ICECAST_HOST,
+    process.env.ICECAST_HOSTNAME,
+    process.env.PUBLIC_STREAM_HOST
+  ];
+
+  for (const raw of hostCandidates) {
+    if (!raw) continue;
+    const host = String(raw).trim();
+    if (!isLocalHostName(host)) return host;
+  }
+
+  for (const url of [
+    process.env.PUBLIC_STREAM_URL,
+    process.env.APP_URL,
+    process.env.RENDER_EXTERNAL_URL
+  ]) {
+    const host = hostnameFromPublicUrl(url);
+    if (host) return host;
+  }
+
+  return null;
+}
+
 function getStreamHostname() {
-  return (
-    process.env.PUBLIC_ICECAST_HOST ||
-    process.env.ICECAST_HOSTNAME ||
-    process.env.PUBLIC_STREAM_HOST ||
-    'localhost'
-  );
+  return resolvePublicIcecastHost() || 'localhost';
 }
 
 function getIcecastConnectHostname() {
-  const host = getStreamHostname();
-  if (process.env.NODE_ENV === 'production' && isLocalHostName(host)) {
-    return process.env.ICECAST_HOST && !isLocalHostName(process.env.ICECAST_HOST)
-      ? process.env.ICECAST_HOST
-      : host;
-  }
-  return host;
+  const publicHost = resolvePublicIcecastHost();
+  if (publicHost) return publicHost;
+
+  // Apenas dev local (sem APP_URL / PUBLIC_STREAM_URL públicos)
+  return process.env.ICECAST_HOST || process.env.ICECAST_HOSTNAME || 'localhost';
 }
 
 function getPublicBaseUrl(urlContext = {}) {

@@ -10,7 +10,7 @@ const { query } = require('../database/connection');
 const { generateToken, generateRefreshToken, verifyToken, authenticate } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const Joi = require('joi');
-const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig, getRequestPublicOrigin } = require('../utils/streamUrls');
+const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig, getRequestPublicOrigin, getIcecastConnectHostname } = require('../utils/streamUrls');
 const { getSubscriptionSummary } = require('../services/subscriptions');
 
 // Validation schemas
@@ -286,11 +286,14 @@ router.get('/stream-connection', authenticate, async (req, res) => {
       dj_name: row.dj_name
     };
 
+    const icecastHost = getIcecastConnectHostname();
+    const icecastPort = parseInt(process.env.ICECAST_PORT, 10) || 8000;
+
     res.json({
       streamConnection: {
         icecast: {
-          host: process.env.PUBLIC_ICECAST_HOST || process.env.ICECAST_HOSTNAME || process.env.ICECAST_HOST || 'localhost',
-          port: parseInt(process.env.ICECAST_PORT, 10) || 8000,
+          host: icecastHost,
+          port: icecastPort,
           mountpoint: mount,
           username: row.source_username || 'source',
           password: row.source_password,

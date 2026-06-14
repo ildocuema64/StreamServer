@@ -13,6 +13,15 @@ function findRepoRoot() {
 }
 
 function loadEnv() {
+  // Em Render/produção: variáveis do painel têm prioridade — não carregar ficheiros .env
+  const skipFiles = process.env.NODE_ENV === 'production'
+    || process.env.RENDER
+    || process.env.RENDER_SERVICE_ID;
+
+  if (skipFiles) {
+    return;
+  }
+
   const root = findRepoRoot();
   const rootEnv = path.join(root, '.env');
   const backendEnv = path.join(root, 'backend', '.env');

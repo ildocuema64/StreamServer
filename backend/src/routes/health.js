@@ -7,6 +7,7 @@ const router = express.Router();
 const { pool } = require('../database/connection');
 const { getRedis, isRedisDisabled } = require('../services/redis');
 const { getServerStats } = require('../services/icecast');
+const { getPublicBaseUrl } = require('../utils/streamUrls');
 
 router.get('/', async (req, res) => {
   const checks = {
@@ -54,6 +55,16 @@ router.get('/', async (req, res) => {
   }
 
   const httpStatus = checks.status === 'ok' ? 200 : 503;
+
+  // Diagnóstico de URLs públicas (sem segredos) — útil para validar APP_URL no Render
+  checks.streamConfig = {
+    appUrl: process.env.APP_URL || null,
+    publicStreamUrl: process.env.PUBLIC_STREAM_URL || null,
+    nodeEnv: process.env.NODE_ENV || null,
+    resolvedListenBase: getPublicBaseUrl({ origin: req.get('origin') || req.get('referer') }),
+    gitCommit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null
+  };
+
   res.status(httpStatus).json(checks);
 });
 

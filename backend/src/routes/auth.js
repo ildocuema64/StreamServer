@@ -10,7 +10,7 @@ const { query } = require('../database/connection');
 const { generateToken, generateRefreshToken, verifyToken, authenticate } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const Joi = require('joi');
-const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig, getRequestPublicOrigin, getIcecastConnectHostname } = require('../utils/streamUrls');
+const { buildListenUrl, buildDirectListenUrl, buildPlayerUrl, buildButtConfig, getRequestPublicOrigin, getIcecastSetupStatus } = require('../utils/streamUrls');
 const { getSubscriptionSummary } = require('../services/subscriptions');
 
 // Validation schemas
@@ -286,24 +286,26 @@ router.get('/stream-connection', authenticate, async (req, res) => {
       dj_name: row.dj_name
     };
 
-    const icecastHost = getIcecastConnectHostname();
-    const icecastPort = parseInt(process.env.ICECAST_PORT, 10) || 8000;
+    const setup = getIcecastSetupStatus();
+    const butt = buildButtConfig(stationForButt, urlContext);
 
     res.json({
       streamConnection: {
         icecast: {
-          host: icecastHost,
-          port: icecastPort,
+          host: setup.connectHost,
+          port: setup.port,
           mountpoint: mount,
           username: row.source_username || 'source',
           password: row.source_password,
           format: row.format || 'mp3',
-          bitrate: row.bitrate || 128
+          bitrate: row.bitrate || 128,
+          configured: setup.configured,
+          setup
         },
         listen_url: buildListenUrl(mount, urlContext),
         listen_url_direct: buildDirectListenUrl(mount),
         player_url: buildPlayerUrl(mount, urlContext),
-        butt: buildButtConfig(stationForButt, urlContext),
+        butt,
         station: { name: row.station_name }
       }
     });

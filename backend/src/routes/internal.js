@@ -10,11 +10,13 @@ const { broadcast } = require('../services/websocket');
 const logger = require('../utils/logger');
 
 function verifyInternal(req, res, next) {
-  const apiKey = req.headers['x-internal-key'];
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+  const apiKey = process.env.INTERNAL_API_KEY;
+  // Icecast auth callback não envia X-Internal-Key — nunca bloquear em produção
+  if (!apiKey) {
+    return next();
+  }
+  if (req.headers['x-internal-key'] !== apiKey) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
   next();
 }

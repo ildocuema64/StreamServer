@@ -7,7 +7,7 @@ const router = express.Router();
 const { pool } = require('../database/connection');
 const { getRedis, isRedisDisabled } = require('../services/redis');
 const { getServerStats } = require('../services/icecast');
-const { getPublicBaseUrl } = require('../utils/streamUrls');
+const { getPublicBaseUrl, getIcecastSetupStatus } = require('../utils/streamUrls');
 
 router.get('/', async (req, res) => {
   const checks = {
@@ -54,18 +54,33 @@ router.get('/', async (req, res) => {
     }
   }
 
-  const httpStatus = checks.status === 'ok' ? 200 : 503;
+  const icecastSetup = getIcecastSetupStatus();
 
   // Diagnóstico de URLs públicas (sem segredos) — útil para validar APP_URL no Render
   checks.streamConfig = {
     appUrl: process.env.APP_URL || null,
     publicStreamUrl: process.env.PUBLIC_STREAM_URL || null,
+    publicIcecastHost: process.env.PUBLIC_ICECAST_HOST || null,
+    icecastHost: process.env.ICECAST_HOST || null,
     nodeEnv: process.env.NODE_ENV || null,
     resolvedListenBase: getPublicBaseUrl({ origin: req.get('origin') || req.get('referer') }),
+    icecastConnectHost: icecastSetup.connectHost,
+    icecastConfigured: icecastSetup.configured,
+    icecastSetupReason: icecastSetup.reason,
+    icecastSetupMessage: icecastSetup.message,
     gitCommit: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null
   };
 
+  if (!icecastSetup.configured && !isIcecastSkipped(checks.services.icecast)) {
+    checks.status = checks.status === 'ok' ? 'degraded' : checks.status;
+  }
+
+  const httpStatus = checks.status === 'ok' ? 200 : 503;
   res.status(httpStatus).json(checks);
 });
+
+function isIcecastSkipped(status) {
+  return status === 'skipped';
+}
 
 module.exports = router;

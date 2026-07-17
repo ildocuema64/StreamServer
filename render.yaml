@@ -29,8 +29,9 @@ services:
       # Icecast: false só quando tiveres um servidor Icecast PÚBLICO acessível.
       - key: ICECAST_DISABLED
         value: "false"
-      # Host público do Icecast para o BUTT transmitir (NÃO uses localhost).
-      # Define o valor real no Dashboard do Render (sync:false = não vem do blueprint).
+      # Host público do Icecast para o BUTT transmitir (NÃO uses localhost nem vercel.app).
+      # OBRIGATÓRIO para transmitir: IP ou domínio da VM onde corre o Icecast (porta 8000).
+      # Script: ./scripts/setup-icecast-vm.sh SEU_HOST_PUBLICO
       - key: PUBLIC_ICECAST_HOST
         sync: false
       - key: ICECAST_HOST

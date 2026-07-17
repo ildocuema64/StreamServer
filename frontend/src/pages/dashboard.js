@@ -146,26 +146,39 @@ async function loadStreamCredentials() {
     }
 
     const ic = sc.icecast;
+    const setup = ic.setup || sc.butt?.setup || {};
+    const configured = ic.configured ?? setup.configured ?? false;
+
     streamCredsText = [
-      `Servidor: ${ic.host}`,
+      `Servidor: ${configured ? ic.host : '(Icecast não configurado — ver Estações)'}`,
       `Porta: ${ic.port}`,
       `Mount: ${ic.mountpoint}`,
       `Utilizador: ${ic.username}`,
       `Password: ${ic.password}`,
       `Formato: ${String(ic.format || '').toUpperCase()} ${ic.bitrate} kbps`,
+      `SSL/TLS: Desligado`,
       `URL ouvir: ${sc.listen_url || ''}`
     ].join('\n');
 
+    const setupBanner = !configured
+      ? `<div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.85rem;">
+          <strong style="color:#f59e0b;">⚠️ Servidor Icecast em falta</strong>
+          <p style="margin:8px 0 0;color:var(--text-muted);">${escapeHtml(setup.message || 'Define PUBLIC_ICECAST_HOST no Render com o host da VM (porta 8000).')}</p>
+        </div>`
+      : '';
+
     body.innerHTML = `
+      ${setupBanner}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div>
           <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px;">Transmitir (BUTT)</div>
           <div style="font-size:0.85rem;line-height:1.7;">
-            <div><strong>Servidor:</strong> ${escapeHtml(ic.host)}</div>
+            <div><strong>Servidor:</strong> ${configured ? escapeHtml(ic.host) : '<span style="color:#f59e0b;">Não configurado</span>'}</div>
             <div><strong>Porta:</strong> ${ic.port}</div>
             <div><strong>Mount:</strong> <code>${escapeHtml(ic.mountpoint)}</code></div>
             <div><strong>Utilizador:</strong> ${escapeHtml(ic.username)}</div>
             <div><strong>Pass:</strong> <code>${escapeHtml(ic.password)}</code></div>
+            <div><strong>SSL:</strong> Desligado</div>
           </div>
         </div>
         <div>

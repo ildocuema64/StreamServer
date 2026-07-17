@@ -73,6 +73,21 @@ function hostnameFromPublicUrl(url) {
   }
 }
 
+/** Hostnames de frontend/CDN — nunca são servidores Icecast (BUTT não liga aqui). */
+const FRONTEND_HOST_SUFFIXES = [
+  '.vercel.app',
+  '.netlify.app',
+  '.pages.dev',
+  '.github.io',
+  '.onrender.com'
+];
+
+function isLikelyFrontendHost(hostname) {
+  if (!hostname) return false;
+  const host = String(hostname).toLowerCase();
+  return FRONTEND_HOST_SUFFIXES.some((suffix) => host === suffix.slice(1) || host.endsWith(suffix));
+}
+
 /** True when APP_URL / PUBLIC_STREAM_URL / NODE_ENV indicam deploy público (não dev local). */
 function isPublicDeployment() {
   if (process.env.NODE_ENV === 'production') return true;
@@ -81,10 +96,14 @@ function isPublicDeployment() {
     .some((u) => !isLocalUrl(u));
 }
 
+function isIcecastDisabled() {
+  return process.env.ICECAST_DISABLED === 'true' || process.env.SKIP_ICECAST === 'true';
+}
+
 /**
- * Host Icecast para o BUTT — nunca localhost em deploy público.
+ * Host Icecast explícito para o BUTT (VM/VPS).
+ * Nunca faz fallback para APP_URL / Vercel — ouvintes e fontes usam hosts diferentes.
  * Ordem: PUBLIC_ICECAST_HOST → ICECAST_HOST → ICECAST_HOSTNAME → PUBLIC_STREAM_HOST
- *        → hostname de PUBLIC_STREAM_URL / APP_URL / RENDER_EXTERNAL_URL
  */
 function resolvePublicIcecastHost() {
   const hostCandidates = [
@@ -97,16 +116,7 @@ function resolvePublicIcecastHost() {
   for (const raw of hostCandidates) {
     if (!raw) continue;
     const host = String(raw).trim();
-    if (!isLocalHostName(host)) return host;
-  }
-
-  for (const url of [
-    process.env.PUBLIC_STREAM_URL,
-    process.env.APP_URL,
-    process.env.RENDER_EXTERNAL_URL
-  ]) {
-    const host = hostnameFromPublicUrl(url);
-    if (host) return host;
+    if (!isLocalHostName(host) && !isLikelyFrontendHost(host)) return host;
   }
 
   return null;
@@ -120,8 +130,85 @@ function getIcecastConnectHostname() {
   const publicHost = resolvePublicIcecastHost();
   if (publicHost) return publicHost;
 
-  // Apenas dev local (sem APP_URL / PUBLIC_STREAM_URL públicos)
-  return process.env.ICECAST_HOST || process.env.ICECAST_HOSTNAME || 'localhost';
+  if (!isPublicDeployment()) {
+    return process.env.ICECAST_HOST || process.env.ICECAST_HOSTNAME || 'localhost';
+  }
+
+  return null;
+}
+
+function getIcecastSetupStatus() {
+  const port = parseInt(process.env.ICECAST_PORT, 10) || 8000;
+  const connectHost = getIcecastConnectHostname();
+
+  if (isIcecastDisabled()) {
+    return {
+      configured: false,
+      ready: false,
+      connectHost: null,
+      port,
+      reason: 'icecast_disabled',
+      message:
+        'Icecast está desactivado (ICECAST_DISABLED=true). Define PUBLIC_ICECAST_HOST e ICECAST_DISABLED=false no Render.'
+    };
+  }
+
+  if (!connectHost) {
+    return {
+      configured: false,
+      ready: false,
+      connectHost: null,
+      port,
+      reason: 'missing_public_icecast_host',
+      message:
+        'Define PUBLIC_ICECAST_HOST no Render com o IP ou domínio da VM onde corre o Icecast (porta 8000). ' +
+        'A Vercel serve só a escuta online — o BUTT liga directamente ao Icecast na VM.'
+    };
+  }
+
+  if (isLocalHostName(connectHost)) {
+    if (!isPublicDeployment()) {
+      return {
+        configured: true,
+        ready: true,
+        connectHost,
+        port,
+        reason: 'local_dev',
+        message: null
+      };
+    }
+    return {
+      configured: false,
+      ready: false,
+      connectHost,
+      port,
+      reason: 'localhost_in_production',
+      message:
+        'PUBLIC_ICECAST_HOST não está definido — o BUTT não pode usar localhost em produção.'
+    };
+  }
+
+  if (isLikelyFrontendHost(connectHost)) {
+    return {
+      configured: false,
+      ready: false,
+      connectHost,
+      port,
+      reason: 'frontend_host_misconfigured',
+      message:
+        `O host "${connectHost}" é um frontend (Vercel/Render), não um servidor Icecast. ` +
+        'Define PUBLIC_ICECAST_HOST com o host público da tua VM.'
+    };
+  }
+
+  return {
+    configured: true,
+    ready: true,
+    connectHost,
+    port,
+    reason: 'ok',
+    message: null
+  };
 }
 
 function getPublicBaseUrl(urlContext = {}) {
@@ -161,6 +248,7 @@ function buildListenUrl(mountpoint, urlContext) {
 
 function buildDirectListenUrl(mountpoint) {
   const host = getIcecastConnectHostname();
+  if (!host) return null;
   const port = parseInt(process.env.ICECAST_PORT, 10) || 8000;
   const mount = normalizeMount(mountpoint);
   const useTls = process.env.ICECAST_TLS === 'true' || process.env.PUBLIC_ICECAST_TLS === 'true';
@@ -194,8 +282,9 @@ channel = 2
 }
 
 function buildButtConfig(station, urlContext) {
-  const hostname = getIcecastConnectHostname();
-  const port = parseInt(process.env.ICECAST_PORT, 10) || 8000;
+  const setup = getIcecastSetupStatus();
+  const hostname = setup.connectHost;
+  const port = setup.port;
   const mount = normalizeMount(station.mountpoint);
   const username = 'source';
   const password = station.source_password || '';
@@ -204,6 +293,7 @@ function buildButtConfig(station, urlContext) {
   const useTls = process.env.ICECAST_TLS === 'true' || process.env.PUBLIC_ICECAST_TLS === 'true';
 
   return {
+    setup,
     server: {
       hostname,
       port,
@@ -226,16 +316,18 @@ function buildButtConfig(station, urlContext) {
     listen_url: buildListenUrl(mount, urlContext),
     listen_url_direct: buildDirectListenUrl(mount),
     player_url: buildPlayerUrl(mount, urlContext),
-    buttFile: buildButtFile({
-      hostname,
-      port,
-      mount,
-      username,
-      password,
-      stationName: station.name,
-      format,
-      bitrate
-    })
+    buttFile: setup.configured
+      ? buildButtFile({
+          hostname,
+          port,
+          mount,
+          username,
+          password,
+          stationName: station.name,
+          format,
+          bitrate
+        })
+      : null
   };
 }
 
@@ -254,14 +346,17 @@ function enrichStation(station, { includePassword = true, origin } = {}) {
   };
 
   if (includePassword && station.source_password) {
+    const setup = getIcecastSetupStatus();
     enriched.icecast = {
-      host: getIcecastConnectHostname(),
-      port: parseInt(process.env.ICECAST_PORT, 10) || 8000,
+      host: setup.connectHost,
+      port: setup.port,
       mountpoint: mount,
       username: 'source',
       password: station.source_password,
       format: station.format || 'mp3',
-      bitrate: station.bitrate || 128
+      bitrate: station.bitrate || 128,
+      configured: setup.configured,
+      setup
     };
     enriched.butt = buildButtConfig(station, urlContext);
   } else {
@@ -284,7 +379,7 @@ function logStreamUrlConfig() {
   if (process.env.NODE_ENV !== 'production') return;
 
   const base = getPublicBaseUrl();
-  const icecastHost = getIcecastConnectHostname();
+  const setup = getIcecastSetupStatus();
 
   if (isLocalUrl(base)) {
     console.warn(
@@ -293,11 +388,8 @@ function logStreamUrlConfig() {
     );
   }
 
-  if (isLocalHostName(icecastHost)) {
-    console.warn(
-      '[stream] PUBLIC_ICECAST_HOST ou ICECAST_HOSTNAME deve ser o host público do Icecast ' +
-        'para o BUTT transmitir em produção.'
-    );
+  if (!setup.configured) {
+    console.warn(`[stream] Icecast/BUTT: ${setup.message}`);
   }
 }
 
@@ -305,6 +397,9 @@ module.exports = {
   normalizeMount,
   getStreamHostname,
   getIcecastConnectHostname,
+  getIcecastSetupStatus,
+  isIcecastDisabled,
+  isLikelyFrontendHost,
   getPublicBaseUrl,
   getRequestPublicOrigin,
   buildListenUrl,

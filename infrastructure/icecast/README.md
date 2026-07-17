@@ -20,6 +20,13 @@ Ouvinte (browser) --HTTPS--> Vercel --rewrite /stream--> Backend (Render) --HTTP
 
 ## Passos
 
+0. **Script rápido (na VM, com Docker instalado)** — a partir do clone do repo ou copiando os ficheiros:
+   ```bash
+   chmod +x scripts/setup-icecast-vm.sh
+   ./scripts/setup-icecast-vm.sh SEU_HOST_PUBLICO https://streamserver-ivu7.onrender.com
+   ```
+   Gera passwords, arranca o container e imprime as variáveis para colar no Render.
+
 1. **Criar VM** (ex.: Oracle Cloud Always Free, Hetzner, Contabo, DigitalOcean). Instalar Docker. Abrir firewall TCP **22** e **8000**.
 
 2. **Copiar** `icecast.prod.xml` e `docker-compose.vm.yml` para a VM.

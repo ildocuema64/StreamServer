@@ -108,6 +108,17 @@ export function renderStations(container) {
           </p>
         </div>
 
+        <div class="cred-section" id="creds-setup-warning" style="display:none;">
+          <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:12px;font-size:0.85rem;line-height:1.5;">
+            <strong style="color:var(--warning,#f59e0b);">⚠️ Icecast ainda não configurado</strong>
+            <p id="creds-setup-message" style="margin:8px 0 0;color:var(--text-muted);"></p>
+            <p style="margin:8px 0 0;color:var(--text-muted);font-size:0.8rem;">
+              O BUTT precisa de um servidor Icecast numa VM (porta 8000). A Vercel serve apenas a URL de escuta online.
+              Consulta <code>infrastructure/icecast/README.md</code> no repositório.
+            </p>
+          </div>
+        </div>
+
         <div class="cred-section">
           <div class="cred-section-header">
             <span>📡 Configuração BUTT (Transmitir)</span>
@@ -276,34 +287,52 @@ let currentButtFile = '';
 
 function showCredentialsFromData(data) {
   const ice = data.icecast || data.butt?.server || {};
+  const setup = data.icecast?.setup || data.butt?.setup || {};
   const listenUrl = data.listen_url || data.butt?.listen_url || '';
   const mount = ice.mountpoint || data.mountpoint || '/live';
-  const host = ice.host || ice.hostname || 'localhost';
-  const port = ice.port || 8000;
+  const host = ice.host || ice.hostname || setup.connectHost || '(Icecast não configurado)';
+  const port = ice.port || setup.port || 8000;
   const password = ice.password || data.source_password || '';
   const format = (ice.format || data.format || 'mp3').toUpperCase();
   const bitrate = ice.bitrate || data.bitrate || 128;
+  const configured = ice.configured ?? setup.configured ?? Boolean(setup.connectHost || (host && host !== '(Icecast não configurado)'));
 
-  const buttText = [
+  const buttLines = [
     '=== BUTT — Broadcast Using This Tool ===',
     `Tipo: Icecast`,
-    `Servidor: ${host}`,
+    `Servidor: ${configured ? host : '(define PUBLIC_ICECAST_HOST no Render)'}`,
     `Porta: ${port}`,
     `Mount: ${mount}`,
     `Utilizador: source`,
     `Password: ${password}`,
     `Codec: ${format}`,
     `Bitrate: ${bitrate} kbps`,
+    'SSL/TLS: Desligado',
     '',
     '=== URL para ouvir online ===',
     listenUrl
-  ].join('\n');
+  ];
+
+  if (!configured && setup.message) {
+    buttLines.splice(1, 0, `⚠️ ${setup.message}`, '');
+  }
+
+  const buttText = buttLines.join('\n');
 
   currentButtFile = data.butt?.buttFile || '';
 
   document.getElementById('creds-title').textContent = data.name || 'Credenciais de Stream';
-  document.getElementById('creds-subtitle').textContent =
-    `Mount ${mount} — cola estes dados no BUTT para transmitir ao vivo.`;
+  document.getElementById('creds-subtitle').textContent = configured
+    ? `Mount ${mount} — cola estes dados no BUTT para transmitir ao vivo.`
+    : `Mount ${mount} — password e mount abaixo; falta configurar o servidor Icecast na VM.`;
+
+  const warningEl = document.getElementById('creds-setup-warning');
+  const warningMsg = document.getElementById('creds-setup-message');
+  if (warningEl) {
+    warningEl.style.display = configured ? 'none' : 'block';
+    if (warningMsg) warningMsg.textContent = setup.message || 'Define PUBLIC_ICECAST_HOST no Render com o host da VM Icecast.';
+  }
+
   document.getElementById('creds-listen-url').textContent = listenUrl;
   document.getElementById('creds-butt-text').textContent = buttText;
 
@@ -317,7 +346,11 @@ function showCredentialsFromData(data) {
   });
 
   document.getElementById('btn-copy-all-creds').onclick = () => copyText(buttText, 'Credenciais copiadas!');
-  document.getElementById('btn-download-butt').onclick = () => downloadButtFile(data.name || 'station', currentButtFile);
+
+  const downloadBtn = document.getElementById('btn-download-butt');
+  downloadBtn.onclick = () => downloadButtFile(data.name || 'station', currentButtFile);
+  downloadBtn.disabled = !currentButtFile;
+  downloadBtn.title = currentButtFile ? '' : 'Configure PUBLIC_ICECAST_HOST no Render para gerar o ficheiro .butt';
 }
 
 function copyText(text, msg = 'Copiado!') {
